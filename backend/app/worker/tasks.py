@@ -2,7 +2,14 @@ import os
 import logging
 from .celery_app import celery_app
 from app.core.database import SessionLocal
-from app.models.core import Document, DocumentChunk
+from app.models.core import Document, DocumentChunk, DocumentMetadata, ActivityLog
+import json
+from app.core.config import settings
+
+try:
+    from groq import Groq
+except ImportError:
+    Groq = None
 
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from sentence_transformers import SentenceTransformer
@@ -82,6 +89,56 @@ def process_document_task(document_id: int):
                 chunk_index=i
             )
             db.add(doc_chunk)
+
+        # AI Metadata Extraction
+        summary, topics, questions = "", [], []
+        groq_client = Groq(api_key=settings.GROQ_API_KEY) if Groq and settings.GROQ_API_KEY else None
+        
+        if groq_client:
+            try:
+                # Use the first 3000 chars for metadata extraction to save tokens/time
+                prompt_text = text[:3000]
+                system_prompt = """You are an AI document analyzer. You must respond ONLY with a valid JSON object matching this schema:
+{
+  "summary": "A 2-3 sentence summary of the document",
+  "topics": ["topic1", "topic2", "topic3", "topic4"],
+  "suggested_questions": ["Question 1?", "Question 2?", "Question 3?"]
+}
+Do not add any markdown formatting, just the raw JSON."""
+                completion = groq_client.chat.completions.create(
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": f"Analyze this document text:\\n{prompt_text}"}
+                    ],
+                    model="llama-3.3-70b-versatile",
+                    response_format={"type": "json_object"}
+                )
+                response_content = completion.choices[0].message.content
+                ai_data = json.loads(response_content)
+                
+                summary = ai_data.get("summary", "")
+                topics = ai_data.get("topics", [])
+                questions = ai_data.get("suggested_questions", [])
+            except Exception as metadata_e:
+                logger.error(f"Failed to generate metadata for doc {document_id}: {metadata_e}")
+        
+        doc_meta = DocumentMetadata(
+            document_id=document_id,
+            summary=summary,
+            topics=topics,
+            suggested_questions=questions
+        )
+        db.add(doc_meta)
+        
+        # Log activity
+        activity = ActivityLog(
+            user_id=None,
+            action="document_processed",
+            target_type="document",
+            target_id=document_id,
+            details=f"Processed '{document.title}' successfully."
+        )
+        db.add(activity)
 
         # Mark completed
         document.status = "completed"

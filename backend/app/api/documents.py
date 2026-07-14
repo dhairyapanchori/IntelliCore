@@ -6,10 +6,12 @@ from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File,
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.models.core import User, Collection, Document
+from app.models.core import User, Collection, Document, ActivityLog
 from app.schemas.core import DocumentResponse
 from app.api.deps import get_current_active_user
 from app.api.collections import check_department_access
+from app.models.core import DocumentChunk, DocumentMetadata
+from sqlalchemy import or_
 
 router = APIRouter()
 
@@ -82,8 +84,84 @@ async def upload_document(
     # Dispatch AI processing task
     from app.worker.tasks import process_document_task
     process_document_task.delay(document.id)
-    
+    # Log activity
+    activity = ActivityLog(
+        user_id=current_user.id,
+        action="document_uploaded",
+        target_type="document",
+        target_id=document.id,
+        details=f"Uploaded document '{file.filename}'"
+    )
+    db.add(activity)
+    db.commit()
+
     return document
+
+@router.get("/{document_id}")
+def get_document_details(
+    document_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Get full document details including metadata."""
+    document = db.query(Document).filter(Document.id == document_id).first()
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+        
+    check_collection_access(db, current_user.id, document.collection_id)
+    
+    metadata = db.query(DocumentMetadata).filter(DocumentMetadata.document_id == document_id).first()
+    
+    return {
+        "id": document.id,
+        "title": document.title,
+        "status": document.status,
+        "file_type": document.file_type,
+        "created_at": document.created_at,
+        "metadata": {
+            "summary": metadata.summary if metadata else None,
+            "topics": metadata.topics if metadata else [],
+            "suggested_questions": metadata.suggested_questions if metadata else []
+        }
+    }
+
+@router.get("/{document_id}/related")
+def get_related_documents(
+    document_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Find related documents based on chunk embedding similarity."""
+    document = db.query(Document).filter(Document.id == document_id).first()
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+        
+    check_collection_access(db, current_user.id, document.collection_id)
+    
+    # We will just pick the first chunk of the current document to find similar documents
+    first_chunk = db.query(DocumentChunk).filter(DocumentChunk.document_id == document_id).first()
+    if not first_chunk:
+        return []
+        
+    distance = DocumentChunk.embedding.cosine_distance(first_chunk.embedding).label('distance')
+    
+    related_chunks = db.query(DocumentChunk, Document, distance)\
+        .join(Document, DocumentChunk.document_id == Document.id)\
+        .filter(Document.id != document_id, Document.collection_id == document.collection_id)\
+        .order_by(distance).limit(5).all()
+        
+    results = []
+    seen = set()
+    for chunk, doc, dist in related_chunks:
+        if doc.id not in seen:
+            seen.add(doc.id)
+            results.append({
+                "id": doc.id,
+                "title": doc.title,
+                "similarity": max(0.0, 1.0 - float(dist))
+            })
+            
+    return results
 
 @router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_document(
