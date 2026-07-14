@@ -202,7 +202,15 @@ export default function CollectionDetail() {
               </thead>
               <tbody className="divide-y divide-border">
                 {documents.map(doc => (
-                  <tr key={doc.id} className="hover:bg-accent/30 transition-colors">
+                  <tr 
+                    key={doc.id} 
+                    className="hover:bg-accent/30 transition-colors cursor-pointer"
+                    onClick={(e) => {
+                      if (!(e.target as HTMLElement).closest('button')) {
+                        navigate(`/dashboard/documents/${doc.id}`);
+                      }
+                    }}
+                  >
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         {getFileIcon(doc.file_type)}

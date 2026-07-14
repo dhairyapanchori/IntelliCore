@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime, JSON, Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.core.database import Base
@@ -18,6 +18,8 @@ class User(Base):
 
     # Relationships
     organizations = relationship("OrganizationUser", back_populates="user")
+    activities = relationship("ActivityLog", back_populates="user")
+    chat_sessions = relationship("ChatSession", back_populates="user")
 
 class Organization(Base):
     __tablename__ = "organizations"
@@ -94,6 +96,7 @@ class Document(Base):
     
     collection = relationship("Collection", back_populates="documents")
     chunks = relationship("DocumentChunk", back_populates="document", cascade="all, delete-orphan")
+    doc_metadata = relationship("DocumentMetadata", back_populates="document", uselist=False, cascade="all, delete-orphan")
 
 class DocumentChunk(Base):
     __tablename__ = "document_chunks"
@@ -112,3 +115,57 @@ class DocumentChunk(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     document = relationship("Document", back_populates="chunks")
+
+class DocumentMetadata(Base):
+    __tablename__ = "document_metadata"
+
+    id = Column(Integer, primary_key=True, index=True)
+    document_id = Column(Integer, ForeignKey("documents.id"), unique=True)
+    summary = Column(Text)
+    topics = Column(JSON)
+    suggested_questions = Column(JSON)
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    document = relationship("Document", back_populates="doc_metadata")
+
+class ActivityLog(Base):
+    __tablename__ = "activity_logs"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    action = Column(String, nullable=False)
+    target_type = Column(String)
+    target_id = Column(Integer)
+    details = Column(String)
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    user = relationship("User", back_populates="activities")
+
+class ChatSession(Base):
+    __tablename__ = "chat_sessions"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    title = Column(String, default="New Chat")
+    is_pinned = Column(Boolean, default=False)
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    user = relationship("User", back_populates="chat_sessions")
+    messages = relationship("ChatMessage", back_populates="session", cascade="all, delete-orphan")
+
+class ChatMessage(Base):
+    __tablename__ = "chat_messages"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(Integer, ForeignKey("chat_sessions.id"))
+    role = Column(String, nullable=False)
+    content = Column(Text, nullable=False)
+    citations = Column(JSON)
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    session = relationship("ChatSession", back_populates="messages")

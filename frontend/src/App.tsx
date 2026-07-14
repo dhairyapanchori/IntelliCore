@@ -1,14 +1,27 @@
 import { BrowserRouter, Routes, Route, Navigate, Link } from 'react-router-dom';
-import { useEffect } from 'react';
+import React, { useEffect, Suspense } from 'react';
 import { motion } from 'framer-motion';
 import { useAuthStore } from './store/authStore';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import DashboardLayout from './layouts/DashboardLayout';
-import Login from './pages/Login';
-import Signup from './pages/Signup';
-import Dashboard from './pages/Dashboard';
-import CollectionDetail from './pages/CollectionDetail';
-import Chat from './pages/Chat';
+
+// Lazy loaded components for better performance
+const Login = React.lazy(() => import('./pages/Login'));
+const Signup = React.lazy(() => import('./pages/Signup'));
+const Dashboard = React.lazy(() => import('./pages/Dashboard')); // We will turn this into DashboardV2 later
+const CollectionDetail = React.lazy(() => import('./pages/CollectionDetail'));
+const DocumentDetail = React.lazy(() => import('./pages/DocumentDetail'));
+const Chat = React.lazy(() => import('./pages/Chat'));
+
+// Global Loading Skeleton
+const PageLoader = () => (
+  <div className="flex h-full w-full items-center justify-center p-8">
+    <div className="flex flex-col items-center space-y-4">
+      <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+      <p className="text-sm text-muted-foreground animate-pulse">Loading module...</p>
+    </div>
+  </div>
+);
 
 function Landing() {
   const { isAuthenticated } = useAuthStore();
@@ -26,7 +39,7 @@ function Landing() {
         className="max-w-3xl text-center space-y-6"
       >
         <div className="inline-block rounded-full border border-border px-3 py-1 text-sm text-muted-foreground mb-4">
-          IntelliCore v1.0
+          IntelliCore v1.1
         </div>
         <h1 className="text-4xl md:text-7xl font-bold tracking-tight text-primary">
           Enterprise Knowledge <br className="hidden md:block"/> 
@@ -60,19 +73,22 @@ function App() {
 
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Landing />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/signup" element={<Signup />} />
-        
-        <Route element={<ProtectedRoute />}>
-          <Route element={<DashboardLayout />}>
-            <Route path="/dashboard" index element={<Dashboard />} />
-            <Route path="/dashboard/chat" element={<Chat />} />
-            <Route path="/dashboard/collections/:id" element={<CollectionDetail />} />
+      <Suspense fallback={<PageLoader />}>
+        <Routes>
+          <Route path="/" element={<Landing />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Signup />} />
+          
+          <Route element={<ProtectedRoute />}>
+            <Route element={<DashboardLayout />}>
+              <Route path="/dashboard" index element={<Dashboard />} />
+              <Route path="/dashboard/chat" element={<Chat />} />
+              <Route path="/dashboard/collections/:id" element={<CollectionDetail />} />
+              <Route path="/dashboard/documents/:id" element={<DocumentDetail />} />
+            </Route>
           </Route>
-        </Route>
-      </Routes>
+        </Routes>
+      </Suspense>
     </BrowserRouter>
   );
 }
