@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
-  Folder, Plus, Search, MoreVertical, LayoutGrid, List,
+  Folder, Plus, Search, LayoutGrid, List,
   Briefcase, Code, DollarSign, Users, Scale, FileText, CheckCircle2, Clock, X, Trash2
 } from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
 import toast from 'react-hot-toast';
 import api from '../lib/api';
 import { useHierarchyStore } from '../store/hierarchyStore';
-import { formatDistanceToNow } from 'date-fns';
 
 export default function Collections() {
   const [collectionsAnalytics, setCollectionsAnalytics] = useState<any[]>([]);

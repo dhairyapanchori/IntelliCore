@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useHierarchyStore } from '../store/hierarchyStore';
 import api from '../lib/api';
 import { 
-  Users, Plus, Search, Filter, MoreVertical, 
+  Users, Plus, Search, Filter, 
   Building2, FileText, HardDrive, List, LayoutGrid,
   MapPin, Settings, X, Trash2
 } from 'lucide-react';
