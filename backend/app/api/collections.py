@@ -59,4 +59,23 @@ def create_collection(
     db.add(collection)
     db.commit()
     db.refresh(collection)
+    db.refresh(collection)
     return collection
+
+@router.delete("/{collection_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_collection(
+    collection_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Delete a collection."""
+    collection = db.query(Collection).filter(Collection.id == collection_id).first()
+    if not collection:
+        raise HTTPException(status_code=404, detail="Collection not found")
+        
+    # Verify access via the department
+    check_department_access(db, current_user.id, collection.department_id)
+    
+    db.delete(collection)
+    db.commit()
+    return

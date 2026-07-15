@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.core import security, config
 from app.core.database import get_db
-from app.models.core import User
+from app.models.core import User, Organization, OrganizationUser, Workspace, Department
 from app.schemas.user import UserCreate, User as UserSchema, Token
 from app.api.deps import get_current_user
 
@@ -27,7 +27,47 @@ def signup(user_in: UserCreate, db: Session = Depends(get_db)):
     db.add(user)
     db.commit()
     db.refresh(user)
-    return user
+
+    try:
+        # Auto-provision hierarchy
+        org = Organization(name="My Organization")
+        db.add(org)
+        db.commit()
+        db.refresh(org)
+
+        org_user = OrganizationUser(
+            organization_id=org.id,
+            user_id=user.id,
+            role="owner"
+        )
+        db.add(org_user)
+        db.commit()
+
+        workspace = Workspace(
+            name="Global Workspace",
+            description="Default workspace for all your documents.",
+            organization_id=org.id,
+            owner_id=user.id,
+            type="Private"
+        )
+        db.add(workspace)
+        db.commit()
+        db.refresh(workspace)
+
+        department = Department(
+            name="General",
+            description="General department.",
+            workspace_id=workspace.id,
+            head_id=user.id
+        )
+        db.add(department)
+        db.commit()
+
+        return user
+    except Exception as e:
+        import traceback
+        error_msg = traceback.format_exc()
+        raise HTTPException(status_code=500, detail=str(error_msg))
 
 @router.post("/login", response_model=Token)
 def login_access_token(

@@ -38,21 +38,28 @@ class OrganizationUser(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"))
     organization_id = Column(Integer, ForeignKey("organizations.id"))
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=True)
     role = Column(String, default="member") # admin, member
     
     user = relationship("User", back_populates="organizations")
     organization = relationship("Organization", back_populates="users")
+    department = relationship("Department")
 
 class Workspace(Base):
     __tablename__ = "workspaces"
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, index=True, nullable=False)
+    description = Column(String, nullable=True)
+    type = Column(String, default="Private")
+    status = Column(String, default="Active")
     organization_id = Column(Integer, ForeignKey("organizations.id"))
+    owner_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     organization = relationship("Organization", back_populates="workspaces")
+    owner = relationship("User")
     departments = relationship("Department", back_populates="workspace")
 
 class Department(Base):
@@ -60,11 +67,16 @@ class Department(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, index=True, nullable=False)
+    description = Column(String, nullable=True)
+    status = Column(String, default="Active")
+    location = Column(String, nullable=True)
     workspace_id = Column(Integer, ForeignKey("workspaces.id"))
+    head_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     workspace = relationship("Workspace", back_populates="departments")
+    head = relationship("User")
     collections = relationship("Collection", back_populates="department")
 
 class Collection(Base):
@@ -143,6 +155,23 @@ class ActivityLog(Base):
     
     user = relationship("User", back_populates="activities")
 
+class DataSource(Base):
+    __tablename__ = "data_sources"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id"))
+    name = Column(String, index=True, nullable=False)
+    type = Column(String, nullable=False) # Cloud Storage, Database, Collaboration, API, File System
+    status = Column(String, default="Connected") # Connected, Failed, Rate Limited, Syncing
+    last_sync = Column(DateTime(timezone=True), nullable=True)
+    document_count = Column(Integer, default=0)
+    size_bytes = Column(Integer, default=0)
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    organization = relationship("Organization")
+
 class ChatSession(Base):
     __tablename__ = "chat_sessions"
     
@@ -169,3 +198,46 @@ class ChatMessage(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     session = relationship("ChatSession", back_populates="messages")
+
+class Report(Base):
+    __tablename__ = "reports"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id"))
+    owner_id = Column(Integer, ForeignKey("users.id"))
+    name = Column(String, index=True, nullable=False)
+    type = Column(String, nullable=False) # Usage, AI, Collections, Data, System, Compliance
+    status = Column(String, default="Completed") # Completed, Scheduled, Draft
+    frequency = Column(String, nullable=True) # Daily, Weekly, Monthly
+    downloads = Column(Integer, default=0)
+    
+    last_run = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    organization = relationship("Organization")
+    owner = relationship("User")
+
+class UserPreference(Base):
+    __tablename__ = "user_preferences"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), unique=True)
+    language = Column(String, default="English (US)")
+    theme = Column(String, default="Dark")
+    timezone = Column(String, default="(GMT+05:30) Asia/Kolkata")
+    date_format = Column(String, default="DD MMM, YYYY • 24-Hour")
+    email_notifications = Column(Boolean, default=True)
+    push_notifications = Column(Boolean, default=True)
+    compact_mode = Column(Boolean, default=False)
+    auto_save = Column(Boolean, default=True)
+    
+    user = relationship("User", backref="preferences")
+
+class SystemSetting(Base):
+    __tablename__ = "system_settings"
+    id = Column(Integer, primary_key=True, index=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id"), unique=True)
+    two_factor_auth = Column(Boolean, default=True)
+    default_workspace_id = Column(Integer, ForeignKey("workspaces.id"), nullable=True)
+    
+    organization = relationship("Organization")

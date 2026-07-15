@@ -13,11 +13,15 @@ interface HierarchyState {
   selectedDepartmentId: number | null;
   
   isLoading: boolean;
+  error: string | null;
   
   // Actions
   fetchOrganizations: () => Promise<void>;
   fetchWorkspaces: (orgId: number) => Promise<void>;
-  fetchDepartments: (workspaceId: number) => Promise<void>;
+  createWorkspace: (name: string, description?: string) => Promise<void>;
+  deleteWorkspace: (id: number) => Promise<void>;
+  fetchDepartments: (workspaceId: number | 'all') => Promise<void>;
+  deleteDepartment: (id: number) => Promise<void>;
   fetchCollections: (departmentId: number) => Promise<void>;
   
   setSelectedOrg: (id: number | null) => void;
@@ -36,11 +40,23 @@ export const useHierarchyStore = create<HierarchyState>((set, get) => ({
   selectedDepartmentId: null,
   
   isLoading: false,
+  error: null,
   
   fetchOrganizations: async () => {
     set({ isLoading: true });
     try {
-      const orgs = await hierarchyApi.getOrganizations();
+      let orgs = await hierarchyApi.getOrganizations();
+      
+      // If user has no organizations, create a default one automatically
+      if (orgs.length === 0) {
+        try {
+          const newOrg = await hierarchyApi.createOrganization({ name: "My Organization", description: "Default Organization" });
+          orgs = [newOrg];
+        } catch (createErr) {
+          console.error("Failed to auto-create organization", createErr);
+        }
+      }
+
       set({ organizations: orgs });
       
       // Auto-select first org if none selected
@@ -68,11 +84,59 @@ export const useHierarchyStore = create<HierarchyState>((set, get) => ({
       set({ isLoading: false });
     }
   },
+
+  createWorkspace: async (name, description) => {
+    // Implementation would go here
+  },
+
+  deleteWorkspace: async (id: number) => {
+    set({ isLoading: true, error: null });
+    try {
+      await hierarchyApi.deleteWorkspace(id);
+      set(state => ({
+        workspaces: state.workspaces.filter(w => w.id !== id),
+        selectedWorkspaceId: state.selectedWorkspaceId === id ? null : state.selectedWorkspaceId,
+        departments: state.selectedWorkspaceId === id ? [] : state.departments,
+        selectedDepartmentId: state.selectedWorkspaceId === id ? null : state.selectedDepartmentId,
+        collections: state.selectedWorkspaceId === id ? [] : state.collections,
+        isLoading: false
+      }));
+    } catch (error) {
+      set({ error: (error as Error).message, isLoading: false });
+      throw error;
+    }
+  },
+
+  deleteDepartment: async (id: number) => {
+    set({ isLoading: true, error: null });
+    try {
+      await hierarchyApi.deleteDepartment(id);
+      set(state => ({
+        departments: state.departments.filter(d => d.id !== id),
+        selectedDepartmentId: state.selectedDepartmentId === id ? null : state.selectedDepartmentId,
+        collections: state.selectedDepartmentId === id ? [] : state.collections,
+        isLoading: false
+      }));
+    } catch (error) {
+      set({ error: (error as Error).message, isLoading: false });
+      throw error;
+    }
+  },
   
   fetchDepartments: async (workspaceId) => {
     set({ isLoading: true });
     try {
-      const departments = await hierarchyApi.getDepartments(workspaceId);
+      let departments = [];
+      if (workspaceId === 'all') {
+        const res = await fetch('http://localhost:8000/api/departments/all', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+        departments = await res.json();
+      } else {
+        departments = await hierarchyApi.getDepartments(workspaceId);
+      }
       set({ departments });
       if (departments.length > 0 && !get().selectedDepartmentId) {
         get().setSelectedDepartment(departments[0].id);

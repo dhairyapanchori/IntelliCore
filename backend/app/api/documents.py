@@ -1,7 +1,7 @@
 import os
 import shutil
 import uuid
-from typing import List
+from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
 from sqlalchemy.orm import Session
 
@@ -59,13 +59,14 @@ def get_all_documents(
 
 @router.post("/upload", response_model=DocumentResponse, status_code=status.HTTP_201_CREATED)
 async def upload_document(
-    collection_id: int = Form(...),
+    collection_id: Optional[int] = Form(None),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
     """Upload a new document to a collection."""
-    check_collection_access(db, current_user.id, collection_id)
+    if collection_id:
+        check_collection_access(db, current_user.id, collection_id)
     
     # Validation
     ext = os.path.splitext(file.filename)[1].lower() if file.filename else ""
@@ -203,3 +204,52 @@ def delete_document(
     db.delete(document)
     db.commit()
     return
+
+@router.post("/{document_id}/log-download")
+def log_download(
+    document_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Log a document download action."""
+    document = db.query(Document).filter(Document.id == document_id).first()
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+        
+    check_collection_access(db, current_user.id, document.collection_id)
+    
+    activity = ActivityLog(
+        user_id=current_user.id,
+        action="download",
+        target_type="document",
+        target_id=document.id,
+        details=f"Downloaded document '{document.title}'"
+    )
+    db.add(activity)
+    db.commit()
+    return {"status": "logged"}
+
+@router.get("/{document_id}/chunks")
+def get_document_chunks(
+    document_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Get raw text chunks for AI debugging and transparency."""
+    document = db.query(Document).filter(Document.id == document_id).first()
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+        
+    check_collection_access(db, current_user.id, document.collection_id)
+    
+    chunks = db.query(DocumentChunk).filter(DocumentChunk.document_id == document_id).order_by(DocumentChunk.chunk_index).all()
+    
+    return [
+        {
+            "id": c.id,
+            "chunk_index": c.chunk_index,
+            "page_number": c.page_number,
+            "text_content": c.text_content
+        } for c in chunks
+    ]
+

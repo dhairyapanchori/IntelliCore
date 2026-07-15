@@ -20,9 +20,10 @@ const Collections = React.lazy(() => import('./pages/Collections'));
 const Departments = React.lazy(() => import('./pages/Departments'));
 const Users = React.lazy(() => import('./pages/Users'));
 const Analytics = React.lazy(() => import('./pages/Analytics'));
+const Reports = React.lazy(() => import('./pages/Reports'));
+const Settings = React.lazy(() => import('./pages/Settings'));
 const KnowledgeGraph = React.lazy(() => import('./pages/KnowledgeGraph'));
 const DataSources = React.lazy(() => import('./pages/DataSources'));
-const ComingSoon = React.lazy(() => import('./pages/ComingSoon'));
 
 // Global Loading Skeleton
 const PageLoader = () => (
@@ -105,8 +106,8 @@ function App() {
               <Route path="/dashboard/departments" element={<Departments />} />
               <Route path="/dashboard/users" element={<Users />} />
               <Route path="/dashboard/analytics" element={<Analytics />} />
-              <Route path="/dashboard/reports" element={<ComingSoon />} />
-              <Route path="/dashboard/settings" element={<ComingSoon />} />
+              <Route path="/dashboard/reports" element={<Reports />} />
+              <Route path="/dashboard/settings" element={<Settings />} />
             </Route>
           </Route>
         </Routes>

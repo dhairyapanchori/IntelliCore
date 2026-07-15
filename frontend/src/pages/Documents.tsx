@@ -1,140 +1,368 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../lib/api';
-import { FileText, File, FileArchive, CheckCircle2, Clock, AlertCircle, Trash2 } from 'lucide-react';
+import { useHierarchyStore } from '../store/hierarchyStore';
+import { documentApi } from '../lib/documents';
+import { 
+  FileText, File, FileArchive, CheckCircle2, Clock, 
+  AlertCircle, Trash2, Search, Filter, Download, Folder, UploadCloud, X
+} from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import toast from 'react-hot-toast';
 
 export default function Documents() {
   const [documents, setDocuments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedDocs, setSelectedDocs] = useState<Set<number>>(new Set());
   const navigate = useNavigate();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [allCollections, setAllCollections] = useState<any[]>([]);
+
+  // Modal State
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [uploadColId, setUploadColId] = useState<number>(0);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+
+  const fetchDocs = async () => {
+    try {
+      const res = await api.get('/documents/all');
+      setDocuments(res.data);
+    } catch (err) {
+      console.error("Failed to load documents", err);
+      toast.error("Failed to load documents");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    async function fetchDocs() {
-      try {
-        const res = await api.get('/documents/all');
-        setDocuments(res.data);
-      } catch (err) {
-        console.error("Failed to load documents", err);
-      } finally {
-        setLoading(false);
-      }
-    }
     fetchDocs();
+    api.get('/analytics/collections').then(res => setAllCollections(res.data)).catch(console.error);
   }, []);
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+    
+    setIsUploading(true);
+    setUploadProgress(0);
+    
+    try {
+      for (let i = 0; i < files.length; i++) {
+        await documentApi.uploadDocument(uploadColId || null, files[i], (progress) => {
+          setUploadProgress(Math.round((i * 100 + progress) / files.length));
+        });
+      }
+      toast.success(`${files.length} document(s) uploaded successfully`);
+      await fetchDocs();
+      setIsModalOpen(false);
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || "Failed to upload file(s)");
+    } finally {
+      setIsUploading(false);
+      setUploadProgress(0);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
 
   const handleDelete = async (e: React.MouseEvent, id: number) => {
     e.stopPropagation();
-    if (!window.confirm('Are you sure you want to delete this document?')) return;
-    
     try {
       await api.delete(`/documents/${id}`);
       setDocuments(docs => docs.filter(d => d.id !== id));
+      toast.success('Document deleted successfully');
     } catch (err) {
       console.error("Failed to delete document", err);
-      alert("Failed to delete document. You might not have permission.");
+      toast.error("Failed to delete document");
     }
+  };
+
+  const getCollectionName = (colId: number) => {
+    const col = allCollections.find(c => c.collection_id === colId);
+    return col ? col.name : 'General (No Collection)';
   };
 
   const getFileIcon = (fileType: string) => {
     switch (fileType.toLowerCase()) {
-      case 'pdf': return <FileText className="text-red-500" size={20} />;
-      case 'docx': return <FileText className="text-blue-500" size={20} />;
-      case 'txt': return <File className="text-slate-400" size={20} />;
-      default: return <FileArchive className="text-primary" size={20} />;
+      case 'pdf': return <FileText className="text-red-400" size={18} />;
+      case 'docx': return <FileText className="text-blue-400" size={18} />;
+      case 'txt': return <File className="text-slate-400" size={18} />;
+      default: return <FileArchive className="text-indigo-400" size={18} />;
     }
   };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'pending': 
-        return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-500/20"><Clock size={12} /> Pending</span>;
+        return <span className="flex items-center gap-1.5 px-2 py-1 text-[10px] font-bold uppercase tracking-wider rounded bg-blue-500/10 border border-blue-500/20 text-blue-400"><Clock size={10} /> Queued</span>;
       case 'processing': 
-        return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-500/20 animate-pulse"><Clock size={12} /> Processing</span>;
+        return <span className="flex items-center gap-1.5 px-2 py-1 text-[10px] font-bold uppercase tracking-wider rounded bg-amber-500/10 border border-amber-500/20 text-amber-500"><div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></div> Syncing</span>;
       case 'completed': 
-        return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20"><CheckCircle2 size={12} /> Ready</span>;
+        return <span className="flex items-center gap-1.5 px-2 py-1 text-[10px] font-bold uppercase tracking-wider rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400"><CheckCircle2 size={10} /> Synced</span>;
       case 'error': 
-        return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-500/20"><AlertCircle size={12} /> Error</span>;
+        return <span className="flex items-center gap-1.5 px-2 py-1 text-[10px] font-bold uppercase tracking-wider rounded bg-red-500/10 border border-red-500/20 text-red-400"><AlertCircle size={10} /> Failed</span>;
       default:
         return null;
     }
   };
 
+  const formatSize = (bytes: number) => {
+    if (!bytes || bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  const toggleSelection = (id: number) => {
+    const newSet = new Set(selectedDocs);
+    if (newSet.has(id)) newSet.delete(id);
+    else newSet.add(id);
+    setSelectedDocs(newSet);
+  };
+
+  const toggleAll = () => {
+    if (selectedDocs.size === documents.length) {
+      setSelectedDocs(new Set());
+    } else {
+      setSelectedDocs(new Set(documents.map(d => d.id)));
+    }
+  };
+
+  const filteredDocs = documents.filter(d => d.title.toLowerCase().includes(searchQuery.toLowerCase()));
+
   return (
-    <div className="flex-1 flex flex-col p-8 overflow-y-auto bg-slate-50 dark:bg-[#0F172A]">
-      <div className="max-w-6xl mx-auto w-full">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">All Documents</h1>
-          <p className="text-slate-500 dark:text-slate-400 mt-2 text-lg">
-            A global view of all documents ingested across your organization.
-          </p>
+    <div className="flex flex-col h-full bg-[#0A0C10] overflow-y-auto scrollbar-thin text-slate-300">
+      
+      {/* Header */}
+      <div className="border-b border-slate-800 bg-[#0A0C10]/90 backdrop-blur-md sticky top-0 z-10 px-8 py-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-white tracking-tight">Global Documents</h1>
+            <p className="text-slate-400 text-sm mt-1">A unified view of all knowledge documents across your enterprise.</p>
+          </div>
+          <div className="flex gap-3">
+            {selectedDocs.size > 0 && (
+              <button 
+                onClick={() => toast('Batch actions coming soon!')}
+                className="bg-[#1E2333] hover:bg-slate-800 border border-slate-700 text-white px-4 py-2.5 rounded-xl text-sm font-medium transition-colors"
+              >
+                Delete Selected ({selectedDocs.size})
+              </button>
+            )}
+            <button 
+              onClick={() => setIsModalOpen(true)} 
+              className="bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2.5 rounded-xl text-sm font-medium flex items-center gap-2 transition-colors shadow-lg shadow-indigo-500/20"
+            >
+              <UploadCloud size={16} /> Upload Document
+            </button>
+            <button onClick={() => navigate('/dashboard/collections')} className="bg-[#1E2333] hover:bg-slate-800 border border-slate-700 text-white px-5 py-2.5 rounded-xl text-sm font-medium transition-colors">
+              Go to Collections
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="p-8">
+        
+        {/* Toolbar */}
+        <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
+          <div className="relative w-full sm:w-auto">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+            <input 
+              type="text" 
+              placeholder="Search across all documents..." 
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="bg-[#13161F] border border-slate-800 text-sm rounded-lg pl-9 pr-4 py-2 w-full sm:w-80 focus:outline-none focus:border-indigo-500/50"
+            />
+          </div>
+          <div className="flex items-center gap-3">
+            <button className="flex items-center gap-2 text-sm text-slate-400 hover:text-white transition-colors bg-[#13161F] border border-slate-800 px-4 py-2 rounded-lg">
+              <Filter size={14} /> Filters
+            </button>
+          </div>
         </div>
 
-        {loading ? (
-          <div className="flex justify-center items-center h-64">
-            <div className="w-8 h-8 rounded-full border-4 border-primary border-t-transparent animate-spin"></div>
-          </div>
-        ) : documents.length === 0 ? (
-          <div className="text-center py-20 bg-white dark:bg-[#1E293B] border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm">
-            <FileText size={48} className="mx-auto text-slate-300 dark:text-slate-600 mb-4" />
-            <h3 className="text-xl font-semibold text-slate-900 dark:text-white mb-2">No documents found</h3>
-            <p className="text-slate-500">Upload documents inside a collection to see them here.</p>
-          </div>
-        ) : (
-          <div className="bg-white dark:bg-[#1E293B] border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden">
-            <table className="w-full text-sm text-left">
-              <thead className="bg-slate-50/50 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400 text-xs uppercase tracking-wider border-b border-slate-200 dark:border-slate-800">
+        {/* Documents Table */}
+        <div className="bg-[#13161F] border border-slate-800 rounded-xl overflow-hidden shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left whitespace-nowrap">
+              <thead className="bg-[#0A0C10] border-b border-slate-800 text-xs font-semibold text-slate-500 uppercase tracking-wider">
                 <tr>
-                  <th className="px-6 py-4 font-medium">Document Name</th>
-                  <th className="px-6 py-4 font-medium hidden md:table-cell">Size</th>
-                  <th className="px-6 py-4 font-medium hidden sm:table-cell">Uploaded</th>
-                  <th className="px-6 py-4 font-medium text-right">Status</th>
-                  <th className="px-6 py-4 font-medium text-right"></th>
+                  <th className="px-6 py-4 w-10">
+                    <input 
+                      type="checkbox" 
+                      checked={documents.length > 0 && selectedDocs.size === documents.length}
+                      onChange={toggleAll}
+                      className="rounded border-slate-700 bg-[#1E2333] text-indigo-500 focus:ring-offset-0 focus:ring-transparent"
+                    />
+                  </th>
+                  <th className="px-6 py-4">Document Name</th>
+                  <th className="px-6 py-4">Collection</th>
+                  <th className="px-6 py-4">Size</th>
+                  <th className="px-6 py-4">Uploaded</th>
+                  <th className="px-6 py-4">Status</th>
+                  <th className="px-6 py-4 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
-                {documents.map(doc => (
-                  <tr 
-                    key={doc.id} 
-                    onClick={() => navigate(`/dashboard/documents/${doc.id}`)}
-                    className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer group"
-                  >
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 flex items-center justify-center shrink-0 group-hover:bg-white dark:group-hover:bg-slate-800 transition-colors">
-                          {getFileIcon(doc.file_type)}
-                        </div>
-                        <div>
-                          <div className="font-medium text-slate-900 dark:text-white group-hover:text-primary transition-colors line-clamp-1">{doc.title}</div>
-                          <div className="text-xs text-slate-500 uppercase mt-0.5">{doc.file_type}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-slate-500 hidden md:table-cell">
-                      {(doc.file_size / 1024 / 1024).toFixed(2)} MB
-                    </td>
-                    <td className="px-6 py-4 text-slate-500 hidden sm:table-cell">
-                      {formatDistanceToNow(new Date(doc.created_at), { addSuffix: true })}
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      {getStatusBadge(doc.status)}
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <button 
-                        onClick={(e) => handleDelete(e, doc.id)}
-                        className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors"
-                        title="Delete document"
-                      >
-                        <Trash2 size={16} />
-                      </button>
+              <tbody className="divide-y divide-slate-800/50">
+                {loading ? (
+                  <tr>
+                    <td colSpan={7} className="px-6 py-20 text-center">
+                      <div className="w-8 h-8 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin mx-auto"></div>
                     </td>
                   </tr>
-                ))}
+                ) : filteredDocs.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-6 py-12 text-center text-slate-500">
+                      No documents found matching your search.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredDocs.map(doc => (
+                    <tr 
+                      key={doc.id} 
+                      className={`hover:bg-[#1E2333]/50 transition-colors cursor-pointer ${selectedDocs.has(doc.id) ? 'bg-indigo-500/5' : ''}`}
+                      onClick={(e) => {
+                        if ((e.target as HTMLElement).tagName !== 'INPUT' && !(e.target as HTMLElement).closest('button')) {
+                          navigate(`/dashboard/documents/${doc.id}`);
+                        }
+                      }}
+                    >
+                      <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                        <input 
+                          type="checkbox" 
+                          checked={selectedDocs.has(doc.id)}
+                          onChange={() => toggleSelection(doc.id)}
+                          className="rounded border-slate-700 bg-[#1E2333] text-indigo-500 focus:ring-offset-0 focus:ring-transparent"
+                        />
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded bg-[#0A0C10] border border-slate-800 flex items-center justify-center shrink-0">
+                            {getFileIcon(doc.file_type)}
+                          </div>
+                          <div>
+                            <div className="font-semibold text-white truncate max-w-sm">{doc.title}</div>
+                            <div className="text-[10px] text-slate-500 font-medium uppercase mt-0.5">{doc.file_type}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-1.5 text-slate-400">
+                          <Folder size={14} className="text-slate-500" />
+                          <span className="truncate max-w-[150px]">{getCollectionName(doc.collection_id)}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-slate-400">
+                        {formatSize(doc.file_size)}
+                      </td>
+                      <td className="px-6 py-4 text-slate-400">
+                        {formatDistanceToNow(new Date(doc.created_at), { addSuffix: true })}
+                      </td>
+                      <td className="px-6 py-4">
+                        {getStatusBadge(doc.status)}
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex justify-end items-center gap-2">
+                          <button onClick={(e) => { e.stopPropagation(); api.post(`/documents/${doc.id}/log-download`); toast('Download starting soon'); }} className="p-1.5 text-slate-500 hover:text-white transition-colors rounded hover:bg-slate-800" title="Download">
+                            <Download size={14} />
+                          </button>
+                          <button 
+                            onClick={(e) => handleDelete(e, doc.id)}
+                            className="p-1.5 text-slate-500 hover:text-red-400 transition-colors rounded hover:bg-slate-800"
+                            title="Delete"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
-        )}
+        </div>
       </div>
+
+      {/* Upload Modal */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#13161F] border border-slate-800 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
+            <div className="flex items-center justify-between p-6 border-b border-slate-800">
+              <h3 className="text-lg font-bold text-white">Upload Document</h3>
+              <button onClick={() => !isUploading && setIsModalOpen(false)} className="text-slate-500 hover:text-white transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Destination Collection</label>
+                <select
+                  value={uploadColId}
+                  onChange={e => setUploadColId(Number(e.target.value))}
+                  disabled={isUploading}
+                  className="w-full bg-[#0A0C10] border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 transition-all text-sm"
+                >
+                  <option value={0}>General (No Collection)</option>
+                  {allCollections.map(c => (
+                    <option key={c.collection_id} value={c.collection_id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div className="pt-2">
+                <input 
+                  type="file" 
+                  multiple 
+                  ref={fileInputRef}
+                  onChange={handleFileUpload}
+                  className="hidden" 
+                />
+                
+                {isUploading ? (
+                  <div className="w-full bg-[#0A0C10] border border-slate-700 border-dashed rounded-xl p-8 flex flex-col items-center justify-center">
+                    <div className="w-12 h-12 rounded-full bg-indigo-500/10 flex items-center justify-center mb-4">
+                      <UploadCloud size={24} className="text-indigo-400 animate-bounce" />
+                    </div>
+                    <div className="text-white font-medium mb-2">Uploading... {uploadProgress}%</div>
+                    <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden max-w-[200px]">
+                      <div className="h-full bg-indigo-500 rounded-full transition-all duration-300" style={{ width: `${uploadProgress}%` }}></div>
+                    </div>
+                  </div>
+                ) : (
+                  <button 
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploading}
+                    className="w-full bg-[#0A0C10] border border-slate-700 border-dashed rounded-xl p-8 flex flex-col items-center justify-center group hover:bg-[#1E2333]/50 hover:border-indigo-500/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <div className="w-12 h-12 rounded-full bg-indigo-500/10 flex items-center justify-center mb-3 group-hover:bg-indigo-500/20 group-hover:scale-110 transition-all">
+                      <UploadCloud size={24} className="text-indigo-400" />
+                    </div>
+                    <div className="text-sm font-medium text-white mb-1">Click to browse files</div>
+                    <div className="text-xs text-slate-500">PDF, DOCX, TXT, MD up to 50MB</div>
+                  </button>
+                )}
+              </div>
+            </div>
+            {!isUploading && (
+              <div className="p-6 border-t border-slate-800 flex justify-end gap-3 bg-[#0A0C10]/50">
+                <button 
+                  onClick={() => setIsModalOpen(false)}
+                  className="px-4 py-2 text-sm font-medium text-slate-300 hover:text-white transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

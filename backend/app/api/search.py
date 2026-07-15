@@ -108,4 +108,12 @@ def advanced_search(
             
     final_results = list(unique_results.values())
     final_results.sort(key=lambda x: x["similarity"], reverse=True)
+    
+    # 5. Log the search activity
+    details = f"Found {len(final_results)} results"
+    if len(final_results) == 0:
+        details += " (no results)"
+    db.add(ActivityLog(user_id=current_user.id, action="search", details=f"Searched for '{request.query}'. {details}"))
+    db.commit()
+    
     return final_results[:request.limit]
