@@ -34,6 +34,7 @@ services:
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/intellicore
       - REDIS_URL=redis://redis:6379/0
       - ENVIRONMENT=development
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
     ports:
       - "8000:8000"
     depends_on:
@@ -52,6 +53,7 @@ services:
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/intellicore
       - REDIS_URL=redis://redis:6379/0
       - ENVIRONMENT=development
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
     command: celery -A app.worker.celery_app worker --loglevel=info
     depends_on:
       - db

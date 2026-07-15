@@ -28,8 +28,8 @@ export default function Chat() {
     try {
       const res = await api.get('/chat/sessions');
       setSessions(res.data);
-      if (res.data.length > 0 && !activeSessionId) {
-        setActiveSessionId(res.data[0].id);
+      if (res.data.length > 0) {
+        setActiveSessionId(prev => prev ? prev : res.data[0].id);
       }
     } catch (e) {
       console.error("Failed to load sessions", e);

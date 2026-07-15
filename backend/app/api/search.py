@@ -99,6 +99,13 @@ def advanced_search(
                     "similarity": max(0.0, 1.0 - float(dist))
                 })
 
-    # Sort hybrid results by similarity
-    results.sort(key=lambda x: x["similarity"], reverse=True)
-    return results[:request.limit]
+    # 4. Group by document to avoid flooding results with chunks from the same file
+    unique_results = {}
+    for r in results:
+        doc_id = r["document_id"]
+        if doc_id not in unique_results or r["similarity"] > unique_results[doc_id]["similarity"]:
+            unique_results[doc_id] = r
+            
+    final_results = list(unique_results.values())
+    final_results.sort(key=lambda x: x["similarity"], reverse=True)
+    return final_results[:request.limit]

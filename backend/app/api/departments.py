@@ -28,6 +28,21 @@ def get_departments(
     departments = db.query(Department).filter(Department.workspace_id == workspace_id).all()
     return departments
 
+@router.get("/all", response_model=List[DepartmentResponse])
+def get_all_departments(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Get all departments across all workspaces accessible by the user."""
+    accessible_orgs = db.query(OrganizationUser.organization_id).filter(OrganizationUser.user_id == current_user.id).all()
+    org_ids = [o[0] for o in accessible_orgs]
+    
+    departments = db.query(Department)\
+        .join(Workspace, Department.workspace_id == Workspace.id)\
+        .filter(Workspace.organization_id.in_(org_ids)).all()
+        
+    return departments
+
 @router.post("/", response_model=DepartmentResponse, status_code=status.HTTP_201_CREATED)
 def create_department(
     department_in: DepartmentCreate,

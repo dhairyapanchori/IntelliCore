@@ -10,7 +10,7 @@ from app.models.core import User, Collection, Document, ActivityLog
 from app.schemas.core import DocumentResponse
 from app.api.deps import get_current_active_user
 from app.api.collections import check_department_access
-from app.models.core import DocumentChunk, DocumentMetadata
+from app.models.core import DocumentChunk, DocumentMetadata, OrganizationUser, Department, Workspace
 from sqlalchemy import or_
 
 router = APIRouter()
@@ -37,6 +37,24 @@ def get_documents(
     """Get all documents for a collection."""
     check_collection_access(db, current_user.id, collection_id)
     documents = db.query(Document).filter(Document.collection_id == collection_id).order_by(Document.created_at.desc()).all()
+    return documents
+
+@router.get("/all", response_model=List[DocumentResponse])
+def get_all_documents(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Get all documents across all collections accessible by the user."""
+    accessible_orgs = db.query(OrganizationUser.organization_id).filter(OrganizationUser.user_id == current_user.id).all()
+    org_ids = [o[0] for o in accessible_orgs]
+    
+    documents = db.query(Document)\
+        .join(Collection, Document.collection_id == Collection.id)\
+        .join(Department, Collection.department_id == Department.id)\
+        .join(Workspace, Department.workspace_id == Workspace.id)\
+        .filter(Workspace.organization_id.in_(org_ids))\
+        .order_by(Document.created_at.desc()).all()
+        
     return documents
 
 @router.post("/upload", response_model=DocumentResponse, status_code=status.HTTP_201_CREATED)
