@@ -15,9 +15,11 @@ export const documentApi = {
   getDocuments: (collectionId: number) => 
     api.get<Document[]>(`/documents/?collection_id=${collectionId}`).then(res => res.data),
     
-  uploadDocument: (collectionId: number, file: File, onProgress?: (progress: number) => void) => {
+  uploadDocument: (collectionId: number | null, file: File, onProgress?: (progress: number) => void) => {
     const formData = new FormData();
-    formData.append('collection_id', collectionId.toString());
+    if (collectionId) {
+      formData.append('collection_id', collectionId.toString());
+    }
     formData.append('file', file);
     
     return api.post<Document>('/documents/upload', formData, {

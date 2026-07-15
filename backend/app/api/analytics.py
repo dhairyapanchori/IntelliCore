@@ -5,116 +5,133 @@ from typing import Dict, Any, List
 from datetime import datetime, timedelta
 
 from app.core.database import get_db
-from app.models.core import User, Document, Collection, ActivityLog, ChatSession, Workspace
+from app.models.core import User, Document, Collection, ActivityLog, ChatSession, ChatMessage, DataSource, Department, Workspace, OrganizationUser
 from app.api.deps import get_current_active_user
+from app.services.analytics_service import AnalyticsService
 
 router = APIRouter()
 
 @router.get("/dashboard", response_model=Dict[str, Any])
+def get_analytics_dashboard(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    service = AnalyticsService(db, current_user)
+    return service.get_analytics_page_metrics()
+
+@router.get("/overview", response_model=Dict[str, Any])
 def get_dashboard_metrics(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
-    """
-    Get aggregate metrics for the dashboard.
-    For MVP, we query all accessible resources for the user.
-    """
-    # 1. Total Documents
-    total_docs = db.query(func.count(Document.id)).filter(Document.status == "completed").scalar() or 0
-    
-    # 2. Total Collections
-    total_collections = db.query(func.count(Collection.id)).scalar() or 0
-    
-    # 3. Storage Used (bytes)
-    storage_bytes = db.query(func.sum(Document.file_size)).filter(Document.status == "completed").scalar() or 0
-    
-    # 4. Processing Status
-    processing_counts = db.query(Document.status, func.count(Document.id)).group_by(Document.status).all()
-    processing_status = {status: count for status, count in processing_counts}
-    
-    # 5. AI Queries (Total Chat Sessions for MVP)
-    ai_queries = db.query(func.count(ChatSession.id)).scalar() or 0
-    
-    # 6. AI Copilot Usage Chart Data (Last 14 days)
-    today = datetime.utcnow().date()
-    fourteen_days_ago = today - timedelta(days=14)
-    
-    # Mock some historical data so the chart isn't empty on a new install,
-    # but use real data for the current day.
-    # In a real scenario, this would group by date.
-    usage_data = []
-    for i in range(14):
-        d = fourteen_days_ago + timedelta(days=i)
-        usage_data.append({
-            "date": d.strftime("%b %d"),
-            "queries": 0 # Would be populated from actual usage logs
-        })
-    # Overwrite the last day with real data
-    real_queries_today = db.query(func.count(ChatSession.id)).filter(func.date(ChatSession.created_at) == today).scalar() or 0
-    if usage_data:
-        usage_data[-1]["queries"] = real_queries_today
-
-    return {
-        "metrics": {
-            "total_documents": total_docs,
-            "total_collections": total_collections,
-            "storage_bytes": storage_bytes,
-            "ai_queries": ai_queries,
-        },
-        "processing_status": {
-            "processed": processing_status.get("completed", 0),
-            "processing": processing_status.get("processing", 0),
-            "queued": processing_status.get("pending", 0),
-            "failed": processing_status.get("error", 0),
-        },
-        "usage_chart": usage_data
-    }
+    service = AnalyticsService(db, current_user)
+    return service.get_dashboard_metrics()
 
 @router.get("/recent-activity")
 def get_recent_activity(
     limit: int = 5,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_active_user)
 ):
-    """Get recent system activity logs."""
-    logs = db.query(ActivityLog).order_by(ActivityLog.created_at.desc()).limit(limit).all()
+    activities = db.query(ActivityLog).filter(ActivityLog.user_id == current_user.id)\
+                   .order_by(ActivityLog.created_at.desc()).limit(limit).all()
+    return [{"action": a.action, "details": a.details, "created_at": a.created_at} for a in activities]
+
+@router.get("/top-collections")
+def get_top_collections(
+    limit: int = 5,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    accessible_orgs = db.query(OrganizationUser.organization_id).filter(OrganizationUser.user_id == current_user.id).all()
+    org_ids = [o[0] for o in accessible_orgs]
     
-    results = []
-    for log in logs:
-        results.append({
-            "id": log.id,
-            "action": log.action,
-            "target_type": log.target_type,
-            "details": log.details,
-            "created_at": log.created_at.isoformat() if log.created_at else None
-        })
-    return results
+    top_cols = db.query(Collection.id, Collection.name, func.count(Document.id).label('document_count'))\
+        .join(Department, Collection.department_id == Department.id)\
+        .join(Workspace, Department.workspace_id == Workspace.id)\
+        .outerjoin(Document, Collection.id == Document.collection_id)\
+        .filter(Workspace.organization_id.in_(org_ids))\
+        .group_by(Collection.id, Collection.name).order_by(func.count(Document.id).desc()).limit(limit).all()
+        
+    return [{"id": c.id, "name": c.name, "document_count": c.document_count} for c in top_cols]
+
+@router.get("/popular-queries")
+def get_popular_queries(
+    limit: int = 5,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    queries = db.query(ChatMessage.content, func.count(ChatMessage.id).label('count'))\
+        .join(ChatSession, ChatMessage.session_id == ChatSession.id)\
+        .filter(ChatSession.user_id == current_user.id, ChatMessage.role == "user")\
+        .group_by(ChatMessage.content).order_by(func.count(ChatMessage.id).desc()).limit(limit).all()
+        
+    return [{"query": q.content, "count": q.count} for q in queries]
 
 @router.get("/graph")
 def get_knowledge_graph(
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    accessible_orgs = db.query(OrganizationUser.organization_id).filter(OrganizationUser.user_id == current_user.id).all()
+    org_ids = [o[0] for o in accessible_orgs]
+    
+    collections = db.query(Collection.id, Collection.name)\
+        .join(Department, Collection.department_id == Department.id)\
+        .join(Workspace, Department.workspace_id == Workspace.id)\
+        .filter(Workspace.organization_id.in_(org_ids)).all()
+        
+    nodes = [{"id": f"col_{c.id}", "name": c.name, "group": 1} for c in collections]
+    
+    col_ids = [c.id for c in collections]
+    if not col_ids:
+        return {"nodes": nodes, "links": []}
+        
+    documents = db.query(Document.id, Document.title, Document.collection_id)\
+        .filter(Document.collection_id.in_(col_ids)).all()
+        
+    nodes.extend([{"id": f"doc_{d.id}", "name": d.title, "group": 2} for d in documents])
+    links = [{"source": f"col_{d.collection_id}", "target": f"doc_{d.id}"} for d in documents]
+    
+    return {"nodes": nodes, "links": links}
+
+@router.get("/collections")
+def get_collections_analytics(
+    db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
-    """
-    Returns a simplified graph representation of Collections and Documents.
-    """
-    nodes = []
-    links = []
+    accessible_orgs = db.query(OrganizationUser.organization_id).filter(OrganizationUser.user_id == current_user.id).all()
+    org_ids = [o[0] for o in accessible_orgs]
     
-    # Add root node
-    nodes.append({"id": "enterprise", "name": "Enterprise Knowledge", "group": 1})
-    
-    collections = db.query(Collection).all()
+    collections = db.query(Collection)\
+        .outerjoin(Department, Collection.department_id == Department.id)\
+        .outerjoin(Workspace, Department.workspace_id == Workspace.id)\
+        .filter(Workspace.organization_id.in_(org_ids)).all()
+
+    result = []
     for col in collections:
-        col_id = f"col_{col.id}"
-        nodes.append({"id": col_id, "name": col.name, "group": 2})
-        links.append({"source": "enterprise", "target": col_id})
+        docs = db.query(Document).filter(Document.collection_id == col.id).all()
+        doc_count = len(docs)
+        total_size = sum(d.file_size for d in docs)
+        last_updated = max((d.created_at for d in docs), default=col.created_at)
         
-        # Add a few documents per collection so the graph isn't too massive
-        docs = db.query(Document).filter(Document.collection_id == col.id, Document.status == 'completed').limit(10).all()
-        for doc in docs:
-            doc_id = f"doc_{doc.id}"
-            nodes.append({"id": doc_id, "name": doc.title, "group": 3})
-            links.append({"source": col_id, "target": doc_id})
-            
-    return {"nodes": nodes, "links": links}
+        processing = sum(1 for d in docs if d.status == "processing")
+        pending = sum(1 for d in docs if d.status == "pending")
+        completed = sum(1 for d in docs if d.status == "completed")
+        error = sum(1 for d in docs if d.status == "error")
+        
+        result.append({
+            "id": col.id,
+            "name": col.name,
+            "document_count": doc_count,
+            "total_size": total_size,
+            "last_updated": last_updated,
+            "status_breakdown": {
+                "processing": processing,
+                "pending": pending,
+                "completed": completed,
+                "error": error
+            }
+        })
+        
+    return result

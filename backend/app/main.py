@@ -8,7 +8,22 @@ app = FastAPI(
     version="1.0.0"
 )
 
-from app.api import api_router
+from app.api import (
+    auth,
+    organizations,
+    workspaces,
+    departments,
+    collections,
+    documents,
+    search,
+    chat,
+    analytics,
+    data_sources,
+    graph,
+    users,
+    reports,
+    settings as app_settings
+)
 from app.core.config import settings
 
 # CORS config
@@ -20,7 +35,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(api_router, prefix=settings.API_V1_STR)
+app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
+app.include_router(organizations.router, prefix="/api/organizations", tags=["organizations"])
+app.include_router(workspaces.router, prefix="/api/workspaces", tags=["workspaces"])
+app.include_router(departments.router, prefix="/api/departments", tags=["departments"])
+app.include_router(collections.router, prefix="/api/collections", tags=["collections"])
+app.include_router(documents.router, prefix="/api/documents", tags=["documents"])
+app.include_router(search.router, prefix="/api/search", tags=["search"])
+app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
+app.include_router(analytics.router, prefix="/api/analytics", tags=["analytics"])
+app.include_router(data_sources.router, prefix="/api/data-sources", tags=["data-sources"])
+app.include_router(graph.router, prefix="/api/graph", tags=["graph"])
+app.include_router(users.router, prefix="/api/users", tags=["users"])
+app.include_router(reports.router, prefix="/api/reports", tags=["reports"])
+app.include_router(app_settings.router, prefix="/api/settings", tags=["settings"])
 
 @app.get("/", include_in_schema=False)
 def root():

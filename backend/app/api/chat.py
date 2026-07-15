@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from sentence_transformers import SentenceTransformer
 import logging
 import json
+import time
 
 from app.core.database import get_db
 from app.models.core import User, DocumentChunk, Document, Collection, OrganizationUser, ChatSession, ChatMessage, ActivityLog
@@ -43,6 +44,9 @@ class SearchResponse(BaseModel):
     answer: str
     citations: List[SearchResult]
     session_id: Optional[int] = None
+    processing_time_ms: int = 0
+    confidence_score: float = 0.0
+    suggested_prompts: List[str] = []
 
 class ChatSessionCreate(BaseModel):
     title: str = "New Chat"
@@ -129,6 +133,8 @@ def semantic_search(
     Perform semantic search over document chunks and answer via AI.
     Saves history if session_id is provided or created.
     """
+    start_time = time.time()
+    
     if model is None:
         raise HTTPException(status_code=500, detail="AI Model not loaded on the backend")
         
@@ -229,5 +235,27 @@ def semantic_search(
     session.updated_at = ai_msg.created_at
     
     db.commit()
+    
+    end_time = time.time()
+    processing_time_ms = int((end_time - start_time) * 1000)
+    
+    # Calculate confidence based on top similarity
+    confidence_score = 0.0
+    if search_results:
+        confidence_score = max(res.similarity for res in search_results)
         
-    return SearchResponse(answer=ai_answer, citations=search_results, session_id=session_id)
+    # Generate generic suggested prompts based on the original query
+    suggested_prompts = [
+        f"Tell me more about {request.query}",
+        "Can you summarize this?",
+        "What are the main exceptions to this?"
+    ]
+        
+    return SearchResponse(
+        answer=ai_answer, 
+        citations=search_results, 
+        session_id=session_id,
+        processing_time_ms=processing_time_ms,
+        confidence_score=round(confidence_score * 100, 1),
+        suggested_prompts=suggested_prompts
+    )

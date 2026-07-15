@@ -1,5 +1,7 @@
+import { useEffect } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
+import { useHierarchyStore } from '../store/hierarchyStore';
 import { 
   LayoutDashboard, Bot, Search, Folder, FileText, Database, Network,
   Building2, Users, BarChart3, FilePieChart, Settings, LogOut, Hexagon
@@ -8,7 +10,12 @@ import {
 export default function DashboardLayout() {
   const location = useLocation();
   const { user, logout } = useAuthStore();
+  const fetchOrganizations = useHierarchyStore(state => state.fetchOrganizations);
   const isCollapsed = false;
+
+  useEffect(() => {
+    fetchOrganizations();
+  }, [fetchOrganizations]);
 
   const navigation = [
     { name: 'Overview', href: '/dashboard', icon: LayoutDashboard },
