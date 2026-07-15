@@ -93,7 +93,7 @@ export default function Collections() {
     if (!confirm('Are you sure you want to delete this collection?')) return;
     try {
       await api.delete(`/collections/${id}`);
-      setCollectionsAnalytics(prev => prev.filter(c => c.collection_id !== id));
+      setCollectionsAnalytics(prev => prev.filter(c => c.id !== id));
       toast.success("Collection deleted successfully");
     } catch (err: any) {
       toast.error(err.response?.data?.detail || err.message || "Failed to delete collection");
@@ -115,7 +115,7 @@ export default function Collections() {
   }, []);
 
   const formatSize = (bytes: number) => {
-    if (bytes === 0) return '0 B';
+    if (!bytes || bytes === 0) return '0 B';
     const k = 1024;
     const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
@@ -229,8 +229,8 @@ export default function Collections() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredCollections.map(c => (
                 <div 
-                  key={c.collection_id}
-                  onClick={() => navigate(`/dashboard/collections/${c.collection_id}`)}
+                  key={c.id}
+                  onClick={() => navigate(`/dashboard/collections/${c.id}`)}
                   className="bg-[#13161F] border border-slate-800 rounded-2xl p-6 hover:border-indigo-500/50 hover:shadow-[0_0_15px_rgba(99,102,241,0.05)] transition-all cursor-pointer group flex flex-col h-full relative overflow-hidden"
                 >
                   <div className="flex items-start justify-between mb-5">
@@ -238,7 +238,7 @@ export default function Collections() {
                       <Folder size={22} fill="currentColor" className="opacity-80" />
                     </div>
                     <button 
-                      onClick={(e) => handleDeleteCollection(e, c.collection_id)} 
+                      onClick={(e) => handleDeleteCollection(e, c.id)} 
                       className="text-slate-500 hover:text-red-400 p-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity"
                       title="Delete Collection"
                     >
@@ -259,7 +259,7 @@ export default function Collections() {
                     <div>
                       <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Storage Size</div>
                       <div className="text-sm font-semibold text-white">
-                        {formatSize(c.total_size_bytes)}
+                        {formatSize(c.total_size || 0)}
                       </div>
                     </div>
                   </div>
@@ -270,12 +270,12 @@ export default function Collections() {
                       {c.last_updated ? `Updated ${formatDistanceToNow(new Date(c.last_updated))} ago` : 'Empty collection'}
                     </div>
                     
-                    {c.status_counts.processing > 0 && (
+                    {c.status_breakdown?.processing > 0 && (
                       <div className="flex items-center gap-1 text-[10px] font-bold text-amber-500 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded">
                         <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></div> Syncing
                       </div>
                     )}
-                    {c.status_counts.processing === 0 && c.document_count > 0 && (
+                    {c.status_breakdown?.processing === 0 && c.document_count > 0 && (
                       <div className="flex items-center gap-1 text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded">
                         <CheckCircle2 size={10} /> Synced
                       </div>
