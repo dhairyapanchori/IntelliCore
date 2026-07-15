@@ -3,8 +3,8 @@ import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { useHierarchyStore } from '../store/hierarchyStore';
 import { 
-  LayoutDashboard, Bot, Search, Folder, FileText, Database, Network,
-  Building2, Users, BarChart3, FilePieChart, Settings, LogOut, Hexagon
+  LayoutDashboard, Bot, Search, Folder, FileText, Network,
+  Building2, BarChart3, Settings, LogOut, Hexagon
 } from 'lucide-react';
 
 export default function DashboardLayout() {
@@ -26,19 +26,15 @@ export default function DashboardLayout() {
     { name: 'Search', href: '/dashboard/search', icon: Search },
     { name: 'Collections', href: '/dashboard/collections', icon: Folder },
     { name: 'Documents', href: '/dashboard/documents', icon: FileText },
-    { name: 'Data Sources', href: '/dashboard/sources', icon: Database },
-    { name: 'Knowledge Graph', href: '/dashboard/graph', icon: Network },
   ];
 
   const orgNav = [
     { name: 'Workspaces', href: '/dashboard/workspaces', icon: Building2 },
     { name: 'Departments', href: '/dashboard/departments', icon: Network },
-    { name: 'Users & Roles', href: '/dashboard/users', icon: Users },
   ];
 
   const systemNav = [
     { name: 'Analytics', href: '/dashboard/analytics', icon: BarChart3 },
-    { name: 'Reports', href: '/dashboard/reports', icon: FilePieChart },
     { name: 'Settings', href: '/dashboard/settings', icon: Settings },
   ];
 

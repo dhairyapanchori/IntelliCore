@@ -17,12 +17,7 @@ from app.api import (
     documents,
     search,
     chat,
-    analytics,
-    data_sources,
-    graph,
-    users,
-    reports,
-    settings as app_settings
+    analytics
 )
 from app.core.config import settings
 from app.core.database import engine
@@ -49,11 +44,6 @@ app.include_router(documents.router, prefix="/api/documents", tags=["documents"]
 app.include_router(search.router, prefix="/api/search", tags=["search"])
 app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
 app.include_router(analytics.router, prefix="/api/analytics", tags=["analytics"])
-app.include_router(data_sources.router, prefix="/api/data-sources", tags=["data-sources"])
-app.include_router(graph.router, prefix="/api/graph", tags=["graph"])
-app.include_router(users.router, prefix="/api/users", tags=["users"])
-app.include_router(reports.router, prefix="/api/reports", tags=["reports"])
-app.include_router(app_settings.router, prefix="/api/settings", tags=["settings"])
 
 @app.get("/", include_in_schema=False)
 def root():

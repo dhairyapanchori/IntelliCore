@@ -6,7 +6,7 @@ import api from '../lib/api';
 import { 
   FileText, UploadCloud, File, FileArchive, CheckCircle2, 
   Clock, AlertCircle, ArrowLeft, Trash2, Search,
-  Filter, HardDrive, Cpu, Activity, Download
+  Filter, HardDrive, Cpu, Activity
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import toast from 'react-hot-toast';
@@ -26,9 +26,6 @@ export default function CollectionDetail() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  
-  // Selection State for Batch Actions
-  const [selectedDocs, setSelectedDocs] = useState<Set<number>>(new Set());
 
   const fetchDocsAndAnalytics = useCallback(async () => {
     if (!collectionId) return;
@@ -101,19 +98,12 @@ export default function CollectionDetail() {
     }
   };
 
-  const toggleSelection = (id: number) => {
-    const newSet = new Set(selectedDocs);
-    if (newSet.has(id)) newSet.delete(id);
-    else newSet.add(id);
-    setSelectedDocs(newSet);
-  };
-
-  const toggleAll = () => {
-    if (selectedDocs.size === documents.length) {
-      setSelectedDocs(new Set());
-    } else {
-      setSelectedDocs(new Set(documents.map(d => d.id)));
-    }
+  const formatSize = (bytes: number) => {
+    if (!bytes || bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
   if (!collection) return null;
@@ -140,14 +130,6 @@ export default function CollectionDetail() {
       default:
         return null;
     }
-  };
-
-  const formatSize = (bytes: number) => {
-    if (!bytes || bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
   const filteredDocs = documents.filter(d => d.title.toLowerCase().includes(searchQuery.toLowerCase()));
@@ -178,15 +160,7 @@ export default function CollectionDetail() {
             <h1 className="text-2xl font-bold text-white tracking-tight">{collection.name}</h1>
             <p className="text-slate-400 text-sm mt-1">Manage documents and verify AI synchronization status.</p>
           </div>
-          <div className="flex gap-3">
-            {selectedDocs.size > 0 && (
-              <button 
-                onClick={() => toast('Batch actions coming soon!')}
-                className="bg-[#1E2333] hover:bg-slate-800 border border-slate-700 text-white px-4 py-2.5 rounded-xl text-sm font-medium transition-colors"
-              >
-                Delete Selected ({selectedDocs.size})
-              </button>
-            )}
+          <div className="flex gap-2">
             <button 
               onClick={() => fileInputRef.current?.click()}
               disabled={isUploading}
@@ -269,14 +243,6 @@ export default function CollectionDetail() {
             <table className="w-full text-sm text-left whitespace-nowrap">
               <thead className="bg-[#0A0C10] border-b border-slate-800 text-xs font-semibold text-slate-500 uppercase tracking-wider">
                 <tr>
-                  <th className="px-6 py-4 w-10">
-                    <input 
-                      type="checkbox" 
-                      checked={documents.length > 0 && selectedDocs.size === documents.length}
-                      onChange={toggleAll}
-                      className="rounded border-slate-700 bg-[#1E2333] text-indigo-500 focus:ring-offset-0 focus:ring-transparent"
-                    />
-                  </th>
                   <th className="px-6 py-4">Document Name</th>
                   <th className="px-6 py-4">Size</th>
                   <th className="px-6 py-4">Uploaded</th>
@@ -287,7 +253,7 @@ export default function CollectionDetail() {
               <tbody className="divide-y divide-slate-800/50">
                 {filteredDocs.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-12 text-center text-slate-500">
+                    <td colSpan={5} className="px-6 py-12 text-center text-slate-500">
                       No documents found in this collection.
                     </td>
                   </tr>
@@ -295,21 +261,13 @@ export default function CollectionDetail() {
                   filteredDocs.map(doc => (
                     <tr 
                       key={doc.id} 
-                      className={`hover:bg-[#1E2333]/50 transition-colors cursor-pointer ${selectedDocs.has(doc.id) ? 'bg-indigo-500/5' : ''}`}
+                      className="hover:bg-[#1E2333]/50 transition-colors cursor-pointer"
                       onClick={(e) => {
-                        if ((e.target as HTMLElement).tagName !== 'INPUT' && !(e.target as HTMLElement).closest('button')) {
+                        if (!(e.target as HTMLElement).closest('button')) {
                           navigate(`/dashboard/documents/${doc.id}`);
                         }
                       }}
                     >
-                      <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
-                        <input 
-                          type="checkbox" 
-                          checked={selectedDocs.has(doc.id)}
-                          onChange={() => toggleSelection(doc.id)}
-                          className="rounded border-slate-700 bg-[#1E2333] text-indigo-500 focus:ring-offset-0 focus:ring-transparent"
-                        />
-                      </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 rounded bg-[#0A0C10] border border-slate-800 flex items-center justify-center shrink-0">
@@ -329,9 +287,6 @@ export default function CollectionDetail() {
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex justify-end items-center gap-2">
-                          <button onClick={(e) => { e.stopPropagation(); api.post(`/documents/${doc.id}/log-download`); toast('Download starting soon'); }} className="p-1.5 text-slate-500 hover:text-white transition-colors rounded hover:bg-slate-800" title="Download">
-                            <Download size={14} />
-                          </button>
                           <button 
                             onClick={(e) => { e.stopPropagation(); handleDelete(doc.id); }}
                             className="p-1.5 text-slate-500 hover:text-red-400 transition-colors rounded hover:bg-slate-800"

@@ -85,7 +85,7 @@ export const useHierarchyStore = create<HierarchyState>((set, get) => ({
     }
   },
 
-  createWorkspace: async (name, description) => {
+  createWorkspace: async (_name, _description) => {
     // Implementation would go here
   },
 

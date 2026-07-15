@@ -1,8 +1,7 @@
 import { useState, useMemo } from 'react';
 import { 
-  Search as SearchIcon, X, Bookmark, HelpCircle, Bell, 
-  FileText, Folder, Network, List, Grid, MoreVertical,
-  Calendar, ChevronDown, ArrowLeft, ArrowUpRight, CheckCircle2, Sparkles, Tags
+  Search as SearchIcon, FileText, Folder, Network, ChevronDown, Calendar, X, HelpCircle, List, Grid,
+  MoreVertical, ArrowLeft, ArrowUpRight, CheckCircle2, Sparkles, Tags
 } from 'lucide-react';
 import { useHierarchyStore } from '../store/hierarchyStore';
 import api from '../lib/api';
@@ -143,25 +142,6 @@ export default function Search() {
           <p className="text-slate-400 text-sm">Find the information you need across your enterprise knowledge.</p>
         </div>
         <div className="flex items-center gap-4">
-          <button 
-            onClick={() => toast('Saved searches feature coming soon!', { icon: '🔖' })}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-slate-700/50 bg-slate-800/30 hover:bg-slate-800/60 text-sm text-slate-300 transition-colors"
-          >
-            <Bookmark size={14} /> Saved Searches
-          </button>
-          <button 
-            onClick={() => toast('Help documentation opening...', { icon: '❓' })}
-            className="w-8 h-8 flex items-center justify-center rounded-full border border-slate-700/50 bg-slate-800/30 hover:bg-slate-800/60 text-slate-400 transition-colors"
-          >
-            <HelpCircle size={16} />
-          </button>
-          <button 
-            onClick={() => toast('No new notifications', { icon: '🔕' })}
-            className="w-8 h-8 flex items-center justify-center rounded-full border border-slate-700/50 bg-slate-800/30 hover:bg-slate-800/60 text-slate-400 transition-colors relative"
-          >
-            <Bell size={16} />
-            <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full border border-[#0A0C10]"></span>
-          </button>
         </div>
       </div>
 
@@ -215,12 +195,6 @@ export default function Search() {
               className={`flex items-center gap-2 pb-3 border-b-2 font-medium text-sm transition-colors ${activeTab === 'collections' ? 'border-indigo-500 text-indigo-400' : 'border-transparent hover:border-slate-700 text-slate-400 hover:text-slate-200'}`}
             >
               <Folder size={16} /> Collections <span className={`${activeTab === 'collections' ? 'bg-indigo-500/20 text-indigo-400' : 'bg-slate-800 text-slate-500'} px-1.5 py-0.5 rounded text-xs`}>0</span>
-            </button>
-            <button 
-              onClick={() => { setActiveTab('graph'); toast('Knowledge graph visualization opened'); }}
-              className={`flex items-center gap-2 pb-3 border-b-2 font-medium text-sm transition-colors ${activeTab === 'graph' ? 'border-indigo-500 text-indigo-400' : 'border-transparent hover:border-slate-700 text-slate-400 hover:text-slate-200'}`}
-            >
-              <Network size={16} /> Knowledge Graph
             </button>
           </div>
 

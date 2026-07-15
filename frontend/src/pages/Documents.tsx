@@ -1,11 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../lib/api';
-import { useHierarchyStore } from '../store/hierarchyStore';
 import { documentApi } from '../lib/documents';
 import { 
   FileText, File, FileArchive, CheckCircle2, Clock, 
-  AlertCircle, Trash2, Search, Filter, Download, Folder, UploadCloud, X
+  AlertCircle, Trash2, Search, Filter, UploadCloud, X, Folder
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import toast from 'react-hot-toast';
@@ -14,7 +13,6 @@ export default function Documents() {
   const [documents, setDocuments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedDocs, setSelectedDocs] = useState<Set<number>>(new Set());
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -22,7 +20,7 @@ export default function Documents() {
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [uploadColId, setUploadColId] = useState<number>(0);
+  const [uploadColId, setUploadColId] = useState<number | ''>('');
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
 
@@ -124,21 +122,6 @@ export default function Documents() {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  const toggleSelection = (id: number) => {
-    const newSet = new Set(selectedDocs);
-    if (newSet.has(id)) newSet.delete(id);
-    else newSet.add(id);
-    setSelectedDocs(newSet);
-  };
-
-  const toggleAll = () => {
-    if (selectedDocs.size === documents.length) {
-      setSelectedDocs(new Set());
-    } else {
-      setSelectedDocs(new Set(documents.map(d => d.id)));
-    }
-  };
-
   const filteredDocs = documents.filter(d => d.title.toLowerCase().includes(searchQuery.toLowerCase()));
 
   return (
@@ -152,14 +135,6 @@ export default function Documents() {
             <p className="text-slate-400 text-sm mt-1">A unified view of all knowledge documents across your enterprise.</p>
           </div>
           <div className="flex gap-3">
-            {selectedDocs.size > 0 && (
-              <button 
-                onClick={() => toast('Batch actions coming soon!')}
-                className="bg-[#1E2333] hover:bg-slate-800 border border-slate-700 text-white px-4 py-2.5 rounded-xl text-sm font-medium transition-colors"
-              >
-                Delete Selected ({selectedDocs.size})
-              </button>
-            )}
             <button 
               onClick={() => setIsModalOpen(true)} 
               className="bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2.5 rounded-xl text-sm font-medium flex items-center gap-2 transition-colors shadow-lg shadow-indigo-500/20"
@@ -200,14 +175,6 @@ export default function Documents() {
             <table className="w-full text-sm text-left whitespace-nowrap">
               <thead className="bg-[#0A0C10] border-b border-slate-800 text-xs font-semibold text-slate-500 uppercase tracking-wider">
                 <tr>
-                  <th className="px-6 py-4 w-10">
-                    <input 
-                      type="checkbox" 
-                      checked={documents.length > 0 && selectedDocs.size === documents.length}
-                      onChange={toggleAll}
-                      className="rounded border-slate-700 bg-[#1E2333] text-indigo-500 focus:ring-offset-0 focus:ring-transparent"
-                    />
-                  </th>
                   <th className="px-6 py-4">Document Name</th>
                   <th className="px-6 py-4">Collection</th>
                   <th className="px-6 py-4">Size</th>
@@ -233,21 +200,13 @@ export default function Documents() {
                   filteredDocs.map(doc => (
                     <tr 
                       key={doc.id} 
-                      className={`hover:bg-[#1E2333]/50 transition-colors cursor-pointer ${selectedDocs.has(doc.id) ? 'bg-indigo-500/5' : ''}`}
+                      className="hover:bg-[#1E2333]/50 transition-colors cursor-pointer"
                       onClick={(e) => {
-                        if ((e.target as HTMLElement).tagName !== 'INPUT' && !(e.target as HTMLElement).closest('button')) {
+                        if (!(e.target as HTMLElement).closest('button')) {
                           navigate(`/dashboard/documents/${doc.id}`);
                         }
                       }}
                     >
-                      <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
-                        <input 
-                          type="checkbox" 
-                          checked={selectedDocs.has(doc.id)}
-                          onChange={() => toggleSelection(doc.id)}
-                          className="rounded border-slate-700 bg-[#1E2333] text-indigo-500 focus:ring-offset-0 focus:ring-transparent"
-                        />
-                      </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 rounded bg-[#0A0C10] border border-slate-800 flex items-center justify-center shrink-0">
@@ -276,9 +235,6 @@ export default function Documents() {
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex justify-end items-center gap-2">
-                          <button onClick={(e) => { e.stopPropagation(); api.post(`/documents/${doc.id}/log-download`); toast('Download starting soon'); }} className="p-1.5 text-slate-500 hover:text-white transition-colors rounded hover:bg-slate-800" title="Download">
-                            <Download size={14} />
-                          </button>
                           <button 
                             onClick={(e) => handleDelete(e, doc.id)}
                             className="p-1.5 text-slate-500 hover:text-red-400 transition-colors rounded hover:bg-slate-800"

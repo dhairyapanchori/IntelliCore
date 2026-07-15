@@ -5,13 +5,13 @@ import { useAuthStore } from '../store/authStore';
 import { 
   FileText, Folder, MessageSquare, HardDrive, 
   Upload, CheckCircle, Clock, Search as SearchIcon, 
-  Bell, ChevronRight, Sparkles, MoreVertical, Network, AlertCircle
+  ChevronRight, Sparkles, MoreVertical, AlertCircle
 } from 'lucide-react';
 import { 
   PieChart, Pie, Cell, AreaChart, Area, XAxis, YAxis, 
   CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer 
 } from 'recharts';
-import toast from 'react-hot-toast';
+
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -19,7 +19,6 @@ export default function Dashboard() {
   
   const [metrics, setMetrics] = useState<any>(null);
   const [activities, setActivities] = useState<any[]>([]);
-  const [graphData, setGraphData] = useState<any>(null);
   const [popularQueries, setPopularQueries] = useState<any[]>([]);
   const [topCollections, setTopCollections] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -28,16 +27,14 @@ export default function Dashboard() {
   useEffect(() => {
     async function loadData() {
       try {
-        const [dashData, activityData, graphResponse, queriesRes, colsRes] = await Promise.all([
+        const [dashData, activityData, queriesRes, colsRes] = await Promise.all([
           analyticsApi.getDashboardMetrics(),
           analyticsApi.getRecentActivity(5),
-          analyticsApi.getKnowledgeGraph(),
           analyticsApi.getPopularQueries(5),
           analyticsApi.getTopCollections(5)
         ]);
         setMetrics(dashData);
         setActivities(activityData);
-        setGraphData(graphResponse);
         setPopularQueries(queriesRes);
         setTopCollections(colsRes);
       } catch (e) {
@@ -126,14 +123,6 @@ export default function Dashboard() {
                 <span className="text-sm text-slate-500 flex-1">Search across your enterprise...</span>
                 <div className="px-1.5 py-0.5 rounded bg-slate-800 text-[10px] font-medium text-slate-400">⌘K</div>
               </div>
-              
-              <button 
-                onClick={() => toast('No new notifications')}
-                className="w-10 h-10 flex items-center justify-center rounded-full border border-slate-800 bg-[#13161F] hover:bg-slate-800/60 text-slate-400 transition-colors relative"
-              >
-                <Bell size={18} />
-                <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-[#13161F]"></span>
-              </button>
             </div>
           </div>
 
@@ -214,7 +203,6 @@ export default function Dashboard() {
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie
-                          data={pieData}
                           innerRadius={55}
                           outerRadius={80}
                           paddingAngle={2}
@@ -331,7 +319,7 @@ export default function Dashboard() {
           </div>
 
           {/* Bottom Row */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             
             {/* Top Collections */}
             <div className="bg-[#13161F] rounded-xl p-5 border border-slate-800 flex flex-col min-h-[260px]">
@@ -375,32 +363,6 @@ export default function Dashboard() {
                   </div>
                 )) : (
                   <div className="flex h-full items-center justify-center text-slate-500 text-xs pb-4">No query data available</div>
-                )}
-              </div>
-            </div>
-
-            {/* Knowledge Graph Preview */}
-            <div className="bg-[#13161F] rounded-xl p-5 border border-slate-800 flex flex-col min-h-[260px]">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="font-semibold text-white text-sm">Knowledge Graph Overview</h3>
-                <button onClick={() => navigate('/dashboard/graph')} className="text-xs text-slate-400 hover:text-white transition-colors flex items-center">
-                  View Graph <ChevronRight size={14} />
-                </button>
-              </div>
-              <div 
-                onClick={() => navigate('/dashboard/graph')}
-                className="flex-1 rounded-lg border border-slate-800/60 bg-[#0A0C10] flex items-center justify-center relative overflow-hidden group cursor-pointer"
-              >
-                {graphData?.nodes?.length > 1 ? (
-                  <>
-                    <Network size={56} className="text-[#6366F1] opacity-20 transform group-hover:scale-110 transition-transform duration-500" />
-                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-[2px]">
-                      <span className="text-sm font-semibold text-white mb-1">Interactive Graph</span>
-                      <span className="text-[10px] text-slate-300">{graphData.nodes.length} nodes · {graphData.links.length} connections</span>
-                    </div>
-                  </>
-                ) : (
-                  <div className="text-slate-500 text-xs">No graph data</div>
                 )}
               </div>
             </div>

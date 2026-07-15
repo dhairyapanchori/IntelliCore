@@ -5,7 +5,7 @@ import { analyticsApi } from '../lib/analytics';
 import { useAuthStore } from '../store/authStore';
 import ReactMarkdown from 'react-markdown';
 import { 
-  MessageSquare, Plus, Search, MoreVertical, Send, Paperclip, 
+  MessageSquare, Plus, Search, MoreVertical, Send, 
   Folder, FileText, Database, Network, Clock, 
   ChevronRight, ThumbsUp, ThumbsDown, Copy, CheckCircle, Edit2
 } from 'lucide-react';
@@ -421,13 +421,6 @@ export default function Chat() {
                 target.style.height = `${Math.min(target.scrollHeight, 200)}px`;
               }}
             />
-            <button 
-              onClick={() => toast('Attachment support coming soon')}
-              className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors"
-              title="Attach documents"
-            >
-              <Paperclip size={18} />
-            </button>
             <button 
               onClick={() => handleSend()}
               disabled={!input.trim() || loading}
