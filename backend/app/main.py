@@ -25,6 +25,11 @@ from app.api import (
     settings as app_settings
 )
 from app.core.config import settings
+from app.core.database import engine
+from app.models.core import Base
+
+# Ensure all tables are created
+Base.metadata.create_all(bind=engine)
 
 # CORS config
 app.add_middleware(

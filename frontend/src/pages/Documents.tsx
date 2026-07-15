@@ -45,27 +45,34 @@ export default function Documents() {
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
-    if (!files || files.length === 0) return;
-    
-    setIsUploading(true);
-    setUploadProgress(0);
-    
-    try {
-      for (let i = 0; i < files.length; i++) {
-        await documentApi.uploadDocument(uploadColId || null, files[i], (progress) => {
-          setUploadProgress(Math.round((i * 100 + progress) / files.length));
-        });
+    const handleUpload = async () => {
+      if (!files || files.length === 0) return;
+      if (uploadColId === '') {
+        toast.error("Please select a collection");
+        return;
       }
-      toast.success(`${files.length} document(s) uploaded successfully`);
-      await fetchDocs();
-      setIsModalOpen(false);
-    } catch (err: any) {
-      toast.error(err.response?.data?.detail || "Failed to upload file(s)");
-    } finally {
-      setIsUploading(false);
+      
+      setIsUploading(true);
       setUploadProgress(0);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    }
+      
+      try {
+        for (let i = 0; i < files.length; i++) {
+          await documentApi.uploadDocument(Number(uploadColId), files[i], (progress) => {
+            setUploadProgress(Math.round((i * 100 + progress) / files.length));
+          });
+        }
+        toast.success(`${files.length} document(s) uploaded successfully`);
+        await fetchDocs();
+        setIsModalOpen(false);
+      } catch (err: any) {
+        toast.error(err.response?.data?.detail || "Failed to upload file(s)");
+      } finally {
+        setIsUploading(false);
+        setUploadProgress(0);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      }
+    };
+    handleUpload();
   };
 
   const handleDelete = async (e: React.MouseEvent, id: number) => {
@@ -300,20 +307,25 @@ export default function Documents() {
                 <X size={20} />
               </button>
             </div>
-            <div className="p-6 space-y-4">
+            <div className="p-6 space-y-5">
               <div>
-                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Destination Collection</label>
+                <label className="block text-sm font-medium text-slate-300 mb-2">Collection <span className="text-rose-500">*</span></label>
                 <select
                   value={uploadColId}
-                  onChange={e => setUploadColId(Number(e.target.value))}
-                  disabled={isUploading}
-                  className="w-full bg-[#0A0C10] border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 transition-all text-sm"
+                  onChange={e => setUploadColId(e.target.value === '' ? '' : Number(e.target.value))}
+                  className="bg-[#0A0C10] border border-slate-700 text-sm rounded-lg block w-full p-2.5 text-white focus:border-indigo-500/50 outline-none"
+                  required
                 >
-                  <option value={0}>General (No Collection)</option>
+                  <option value="">Select a collection</option>
                   {allCollections.map(c => (
-                    <option key={c.collection_id} value={c.collection_id}>{c.name}</option>
+                    <option key={c.collection_id} value={c.collection_id}>
+                      {c.workspace_name} / {c.name}
+                    </option>
                   ))}
                 </select>
+                {allCollections.length === 0 && (
+                  <p className="text-xs text-amber-400 mt-2">You must create a collection in the Collections tab first.</p>
+                )}
               </div>
               
               <div className="pt-2">

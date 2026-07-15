@@ -59,14 +59,13 @@ def get_all_documents(
 
 @router.post("/upload", response_model=DocumentResponse, status_code=status.HTTP_201_CREATED)
 async def upload_document(
-    collection_id: Optional[int] = Form(None),
+    collection_id: int = Form(...),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
     """Upload a new document to a collection."""
-    if collection_id:
-        check_collection_access(db, current_user.id, collection_id)
+    check_collection_access(db, current_user.id, collection_id)
     
     # Validation
     ext = os.path.splitext(file.filename)[1].lower() if file.filename else ""
