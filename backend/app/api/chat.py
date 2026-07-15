@@ -197,7 +197,8 @@ def semantic_search(
         messages = [{"role": "system", "content": "You are IntelliChat, an enterprise AI assistant. Answer the user's query based ONLY on the provided document excerpts. Be conversational but concise. If the answer is not in the excerpts, say you don't know based on the provided documents."}]
         
         for msg in history[:-1]: # exclude the current one we just added
-            messages.append({"role": msg.role, "content": msg.content})
+            role = "assistant" if msg.role == "ai" else msg.role
+            messages.append({"role": role, "content": msg.content})
             
         context_text = "\\n\\n".join([f"Document: {r.document_title}\\nExcerpt: {r.text_content}" for r in search_results])
         user_prompt = f"Context from documents:\\n{context_text}\\n\\nUser Query: {request.query}"

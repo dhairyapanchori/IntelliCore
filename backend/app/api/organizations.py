@@ -64,3 +64,33 @@ def get_organization(
     if not org:
         raise HTTPException(status_code=404, detail="Organization not found")
     return org
+
+@router.get("/{org_id}/users")
+def get_organization_users(
+    org_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Get all users for a specific organization."""
+    access = db.query(OrganizationUser).filter(
+        OrganizationUser.organization_id == org_id,
+        OrganizationUser.user_id == current_user.id
+    ).first()
+    if not access:
+        raise HTTPException(status_code=403, detail="Not enough permissions")
+        
+    org_users = db.query(OrganizationUser, User)\
+        .join(User, OrganizationUser.user_id == User.id)\
+        .filter(OrganizationUser.organization_id == org_id)\
+        .all()
+        
+    result = []
+    for org_user, user in org_users:
+        result.append({
+            "id": user.id,
+            "email": user.email,
+            "full_name": user.full_name,
+            "is_active": user.is_active,
+            "role": org_user.role
+        })
+    return result

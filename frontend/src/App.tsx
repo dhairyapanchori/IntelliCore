@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { useAuthStore } from './store/authStore';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import DashboardLayout from './layouts/DashboardLayout';
+import { Toaster } from 'react-hot-toast';
 
 // Lazy loaded components for better performance
 const Login = React.lazy(() => import('./pages/Login'));
@@ -11,7 +12,17 @@ const Signup = React.lazy(() => import('./pages/Signup'));
 const Dashboard = React.lazy(() => import('./pages/Dashboard')); // We will turn this into DashboardV2 later
 const CollectionDetail = React.lazy(() => import('./pages/CollectionDetail'));
 const DocumentDetail = React.lazy(() => import('./pages/DocumentDetail'));
+const Documents = React.lazy(() => import('./pages/Documents'));
+const Workspaces = React.lazy(() => import('./pages/Workspaces'));
 const Chat = React.lazy(() => import('./pages/Chat'));
+const Search = React.lazy(() => import('./pages/Search'));
+const Collections = React.lazy(() => import('./pages/Collections'));
+const Departments = React.lazy(() => import('./pages/Departments'));
+const Users = React.lazy(() => import('./pages/Users'));
+const Analytics = React.lazy(() => import('./pages/Analytics'));
+const KnowledgeGraph = React.lazy(() => import('./pages/KnowledgeGraph'));
+const DataSources = React.lazy(() => import('./pages/DataSources'));
+const ComingSoon = React.lazy(() => import('./pages/ComingSoon'));
 
 // Global Loading Skeleton
 const PageLoader = () => (
@@ -85,10 +96,22 @@ function App() {
               <Route path="/dashboard/chat" element={<Chat />} />
               <Route path="/dashboard/collections/:id" element={<CollectionDetail />} />
               <Route path="/dashboard/documents/:id" element={<DocumentDetail />} />
+              <Route path="/dashboard/search" element={<Search />} />
+              <Route path="/dashboard/collections" element={<Collections />} />
+              <Route path="/dashboard/documents" element={<Documents />} />
+              <Route path="/dashboard/sources" element={<DataSources />} />
+              <Route path="/dashboard/graph" element={<KnowledgeGraph />} />
+              <Route path="/dashboard/workspaces" element={<Workspaces />} />
+              <Route path="/dashboard/departments" element={<Departments />} />
+              <Route path="/dashboard/users" element={<Users />} />
+              <Route path="/dashboard/analytics" element={<Analytics />} />
+              <Route path="/dashboard/reports" element={<ComingSoon />} />
+              <Route path="/dashboard/settings" element={<ComingSoon />} />
             </Route>
           </Route>
         </Routes>
       </Suspense>
+      <Toaster position="bottom-right" toastOptions={{ style: { background: '#1E2333', color: '#fff', border: '1px solid #334155' } }} />
     </BrowserRouter>
   );
 }
