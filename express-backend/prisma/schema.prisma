@@ -1,0 +1,255 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  extensions = [vector]
+}
+
+model activity_logs {
+  id          Int       @id @default(autoincrement())
+  user_id     Int?
+  action      String    @db.VarChar
+  target_type String?   @db.VarChar
+  target_id   Int?
+  details     String?   @db.VarChar
+  created_at  DateTime? @default(now()) @db.Timestamptz(6)
+  users       users?    @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([id], map: "ix_activity_logs_id")
+}
+
+model alembic_version {
+  version_num String @id(map: "alembic_version_pkc") @db.VarChar(32)
+}
+
+model chat_messages {
+  id            Int            @id @default(autoincrement())
+  session_id    Int?
+  role          String         @db.VarChar
+  content       String
+  citations     Json?          @db.Json
+  created_at    DateTime?      @default(now()) @db.Timestamptz(6)
+  chat_sessions chat_sessions? @relation(fields: [session_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([id], map: "ix_chat_messages_id")
+}
+
+model chat_sessions {
+  id            Int             @id @default(autoincrement())
+  user_id       Int?
+  title         String?         @db.VarChar
+  is_pinned     Boolean?
+  created_at    DateTime?       @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime?       @db.Timestamptz(6)
+  chat_messages chat_messages[]
+  users         users?          @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([id], map: "ix_chat_sessions_id")
+}
+
+model collections {
+  id            Int          @id @default(autoincrement())
+  name          String       @db.VarChar
+  department_id Int?
+  created_at    DateTime?    @default(now()) @db.Timestamptz(6)
+  description   String?      @db.VarChar
+  updated_at    DateTime?    @db.Timestamptz(6)
+  departments   departments? @relation(fields: [department_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  documents     documents[]
+
+  @@index([id], map: "ix_collections_id")
+  @@index([name], map: "ix_collections_name")
+}
+
+model data_sources {
+  id              Int            @id @default(autoincrement())
+  organization_id Int?
+  name            String         @db.VarChar
+  type            String         @db.VarChar
+  status          String?        @db.VarChar
+  last_sync       DateTime?      @db.Timestamptz(6)
+  document_count  Int?
+  size_bytes      Int?
+  created_at      DateTime?      @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime?      @db.Timestamptz(6)
+  organizations   organizations? @relation(fields: [organization_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([id], map: "ix_data_sources_id")
+  @@index([name], map: "ix_data_sources_name")
+}
+
+model departments {
+  id                 Int                  @id @default(autoincrement())
+  name               String               @db.VarChar
+  workspace_id       Int?
+  created_at         DateTime?            @default(now()) @db.Timestamptz(6)
+  description        String?              @db.VarChar
+  status             String?              @db.VarChar
+  location           String?              @db.VarChar
+  head_id            Int?
+  updated_at         DateTime?            @db.Timestamptz(6)
+  collections        collections[]
+  workspaces         workspaces?          @relation(fields: [workspace_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  organization_users organization_users[]
+
+  @@index([id], map: "ix_departments_id")
+  @@index([name], map: "ix_departments_name")
+}
+
+model document_chunks {
+  id           Int                    @id @default(autoincrement())
+  document_id  Int?
+  text_content String                 @db.VarChar
+  embedding    Unsupported("vector")?
+  page_number  Int?
+  chunk_index  Int
+  created_at   DateTime?              @default(now()) @db.Timestamptz(6)
+  documents    documents?             @relation(fields: [document_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([id], map: "ix_document_chunks_id")
+}
+
+model document_metadata {
+  id                  Int        @id @default(autoincrement())
+  document_id         Int?       @unique
+  summary             String?
+  topics              Json?      @db.Json
+  suggested_questions Json?      @db.Json
+  created_at          DateTime?  @default(now()) @db.Timestamptz(6)
+  documents           documents? @relation(fields: [document_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([id], map: "ix_document_metadata_id")
+}
+
+model documents {
+  id                Int                @id @default(autoincrement())
+  collection_id     Int?
+  title             String             @db.VarChar
+  original_filename String             @db.VarChar
+  file_type         String             @db.VarChar
+  file_size         Int
+  storage_path      String             @db.VarChar
+  status            String?            @db.VarChar
+  created_at        DateTime?          @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime?          @db.Timestamptz(6)
+  document_chunks   document_chunks[]
+  document_metadata document_metadata?
+  collections       collections?       @relation(fields: [collection_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([id], map: "ix_documents_id")
+  @@index([title], map: "ix_documents_title")
+}
+
+model organization_users {
+  id              Int            @id @default(autoincrement())
+  user_id         Int?
+  organization_id Int?
+  role            String?        @db.VarChar
+  department_id   Int?
+  departments     departments?   @relation(fields: [department_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  organizations   organizations? @relation(fields: [organization_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users           users?         @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([id], map: "ix_organization_users_id")
+}
+
+model organizations {
+  id                 Int                  @id @default(autoincrement())
+  name               String               @db.VarChar
+  created_at         DateTime?            @default(now()) @db.Timestamptz(6)
+  description        String?              @db.VarChar
+  updated_at         DateTime?            @db.Timestamptz(6)
+  data_sources       data_sources[]
+  organization_users organization_users[]
+  reports            reports[]
+  system_settings    system_settings?
+  workspaces         workspaces[]
+
+  @@index([id], map: "ix_organizations_id")
+  @@index([name], map: "ix_organizations_name")
+}
+
+model reports {
+  id              Int            @id @default(autoincrement())
+  organization_id Int?
+  owner_id        Int?
+  name            String         @db.VarChar
+  type            String         @db.VarChar
+  status          String?        @db.VarChar
+  frequency       String?        @db.VarChar
+  downloads       Int?
+  last_run        DateTime?      @db.Timestamptz(6)
+  created_at      DateTime?      @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime?      @db.Timestamptz(6)
+  organizations   organizations? @relation(fields: [organization_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users           users?         @relation(fields: [owner_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([id], map: "ix_reports_id")
+  @@index([name], map: "ix_reports_name")
+}
+
+model system_settings {
+  id                   Int            @id @default(autoincrement())
+  organization_id      Int?           @unique
+  two_factor_auth      Boolean?
+  default_workspace_id Int?
+  workspaces           workspaces?    @relation(fields: [default_workspace_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  organizations        organizations? @relation(fields: [organization_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([id], map: "ix_system_settings_id")
+}
+
+model user_preferences {
+  id                  Int      @id @default(autoincrement())
+  user_id             Int?     @unique
+  language            String?  @db.VarChar
+  theme               String?  @db.VarChar
+  timezone            String?  @db.VarChar
+  date_format         String?  @db.VarChar
+  email_notifications Boolean?
+  push_notifications  Boolean?
+  compact_mode        Boolean?
+  auto_save           Boolean?
+  users               users?   @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([id], map: "ix_user_preferences_id")
+}
+
+model users {
+  id                 Int                  @id @default(autoincrement())
+  email              String               @unique(map: "ix_users_email") @db.VarChar
+  hashed_password    String               @db.VarChar
+  full_name          String?              @db.VarChar
+  is_active          Boolean?
+  is_superuser       Boolean?
+  created_at         DateTime?            @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime?            @db.Timestamptz(6)
+  activity_logs      activity_logs[]
+  chat_sessions      chat_sessions[]
+  organization_users organization_users[]
+  reports            reports[]
+  user_preferences   user_preferences?
+
+  @@index([id], map: "ix_users_id")
+}
+
+model workspaces {
+  id              Int               @id @default(autoincrement())
+  name            String            @db.VarChar
+  organization_id Int?
+  created_at      DateTime?         @default(now()) @db.Timestamptz(6)
+  description     String?           @db.VarChar
+  type            String?           @db.VarChar
+  status          String?           @db.VarChar
+  owner_id        Int?
+  updated_at      DateTime?         @db.Timestamptz(6)
+  departments     departments[]
+  system_settings system_settings[]
+  organizations   organizations?    @relation(fields: [organization_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([id], map: "ix_workspaces_id")
+  @@index([name], map: "ix_workspaces_name")
+}
