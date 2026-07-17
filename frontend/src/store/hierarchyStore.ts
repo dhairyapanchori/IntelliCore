@@ -128,12 +128,7 @@ export const useHierarchyStore = create<HierarchyState>((set, get) => ({
     try {
       let departments = [];
       if (workspaceId === 'all') {
-        const res = await fetch('http://localhost:8000/api/departments/all', {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          }
-        });
-        departments = await res.json();
+        departments = await api.get('/departments/all').then(res => res.data);
       } else {
         departments = await hierarchyApi.getDepartments(workspaceId);
       }

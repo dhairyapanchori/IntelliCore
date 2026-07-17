@@ -212,8 +212,33 @@ model user_preferences {
   email_notifications Boolean?
   push_notifications  Boolean?
   compact_mode        Boolean?
-  auto_save           Boolean?
-  users               users?   @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  auto_save                   Boolean? @default(true)
+  
+  // AI Copilot
+  default_ai_model            String?  @default("gpt-4o") @db.VarChar
+  response_length             String?  @default("balanced") @db.VarChar
+  citation_toggle             Boolean? @default(true)
+  show_confidence_score       Boolean? @default(false)
+  enable_follow_up            Boolean? @default(true)
+
+  // Search
+  default_search_scope        String?  @default("all") @db.VarChar
+  search_results_count        Int?     @default(10)
+  semantic_search             Boolean? @default(true)
+
+  // Notifications
+  ai_processing_notifications Boolean? @default(true)
+
+  // Documents
+  default_collection_id       Int?
+  auto_ocr                    Boolean? @default(true)
+  auto_entity_extraction      Boolean? @default(true)
+  auto_summarize              Boolean? @default(true)
+
+  // Security
+  two_factor_auth             Boolean? @default(false)
+  
+  users                       users?   @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@index([id], map: "ix_user_preferences_id")
 }

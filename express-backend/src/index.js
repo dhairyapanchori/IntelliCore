@@ -18,6 +18,7 @@ const documentRoutes = require('./routes/documents');
 const searchRoutes = require('./routes/search');
 const chatRoutes = require('./routes/chat');
 const analyticsRoutes = require('./routes/analytics');
+const settingsRoutes = require('./routes/settings');
 
 // Basic health check route
 app.get('/health', (req, res) => {
@@ -34,6 +35,7 @@ app.use('/api/v1/documents', documentRoutes);
 app.use('/api/v1/search', searchRoutes);
 app.use('/api/v1/chat', chatRoutes);
 app.use('/api/v1/analytics', analyticsRoutes);
+app.use('/api/v1/settings', settingsRoutes);
 
 // Start server
 app.listen(PORT, () => {

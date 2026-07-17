@@ -138,7 +138,7 @@ const semanticSearch = async (req, res) => {
     if (process.env.GROQ_API_KEY && searchResults.length > 0) {
       const chat = new ChatGroq({
         apiKey: process.env.GROQ_API_KEY,
-        modelName: "llama-3.3-70b-versatile",
+        model: "llama-3.3-70b-versatile",
       });
 
       const history = await prisma.chat_messages.findMany({
