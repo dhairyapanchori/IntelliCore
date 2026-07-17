@@ -75,9 +75,7 @@ export default function DashboardLayout() {
         {/* Logo Area */}
         <div className="h-20 flex items-center px-5 border-b border-white/5">
           <Link to="/dashboard" className="flex items-center gap-3 cursor-pointer group">
-            <div className="bg-primary/20 p-2 rounded-xl group-hover:bg-primary/30 transition-colors">
-              <Hexagon className="text-primary fill-primary/20" size={24} />
-            </div>
+            <img src="/favicon.svg" alt="IntelliCore" className="w-10 h-10 drop-shadow-lg group-hover:scale-105 transition-transform" />
             {!isCollapsed && (
               <div className="flex flex-col">
                 <span className="font-bold text-lg text-white tracking-tight leading-tight">IntelliCore</span>

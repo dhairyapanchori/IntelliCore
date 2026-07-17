@@ -18,7 +18,7 @@ const getWorkspaces = async (req, res) => {
     const workspaces = await prisma.workspaces.findMany({
       where: { organization_id: orgId },
       include: {
-        users: true, // owner
+        // users: true, // owner
         departments: {
           include: {
             collections: {
@@ -56,7 +56,7 @@ const getWorkspaces = async (req, res) => {
         type: ws.type || 'Private',
         status: ws.status || 'Active',
         owner_id: ws.owner_id,
-        owner_name: ws.users ? ws.users.full_name : null,
+        owner_name: null,
         members_count: orgMembersCount,
         collections_count: colCount,
         documents_count: docCount,
