@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const prisma = require('../config/db');
 const { authenticateToken } = require('../middlewares/auth.middleware');
-const bcrypt = require('bcryptjs');
+const bcrypt = require('bcrypt');
 
 router.use(authenticateToken);
 

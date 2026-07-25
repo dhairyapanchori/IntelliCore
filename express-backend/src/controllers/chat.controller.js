@@ -107,7 +107,7 @@ const semanticSearch = async (req, res) => {
     });
     const orgIds = orgs.map(o => o.organization_id);
 
-    let whereClause = `w.organization_id IN (${orgIds.join(',')}) AND d.status = 'completed'`;
+    let whereClause = `w.organization_id IN (${orgIds.join(',') || '0'}) AND d.status = 'completed'`;
     if (collection_id) {
       whereClause += ` AND d.collection_id = ${parseInt(collection_id)}`;
     }

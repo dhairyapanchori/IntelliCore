@@ -31,14 +31,14 @@ export default function Workspaces() {
       await fetchOrganizations();
     };
     load();
-  }, []);
+  }, [fetchOrganizations]);
 
   // Once selectedOrgId is populated, fetch workspaces
   useEffect(() => {
     if (selectedOrgId) {
       fetchWorkspaces(selectedOrgId);
     }
-  }, [selectedOrgId]);
+  }, [selectedOrgId, fetchWorkspaces]);
 
   const handleCreate = async () => {
     if (!newName.trim()) {
@@ -109,7 +109,7 @@ export default function Workspaces() {
     if (workspaces.length > 0 && !selectedWorkspaceId) {
       setSelectedWorkspaceId(workspaces[0].id);
     }
-  }, [workspaces]);
+  }, [workspaces, selectedWorkspaceId]);
 
   const selectedWorkspace = workspaces.find(w => w.id === selectedWorkspaceId) || workspaces[0] || null;
 

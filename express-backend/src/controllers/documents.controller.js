@@ -3,21 +3,25 @@ const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const { Queue } = require('bullmq');
 const prisma = require('../config/db');
+const { createRedisConnection } = require('../config/redis');
 
 const UPLOAD_DIR = path.join(process.cwd(), 'uploads');
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
-// Setup BullMQ for processing
+// Setup BullMQ for processing using centralized graceful Redis connection
 const documentQueue = new Queue('documentProcessing', {
-  connection: {
-    host: process.env.REDIS_HOST || 'redis',
-    port: process.env.REDIS_PORT ? parseInt(process.env.REDIS_PORT) : 6379
-  }
+  connection: createRedisConnection()
+});
+
+documentQueue.on('error', (err) => {
+  // Prevent unhandled errors from crashing the Express application if Redis is offline or restarting
 });
 
 const checkCollectionAccess = async (userId, collectionId) => {
+  const cid = parseInt(collectionId, 10);
+  if (isNaN(cid)) throw new Error("Invalid collection_id integer");
   const collection = await prisma.collections.findUnique({
-    where: { id: collectionId },
+    where: { id: cid },
     include: { departments: true }
   });
   if (!collection) throw new Error("Collection not found");
@@ -91,7 +95,8 @@ const getAllDocuments = async (req, res) => {
 
 const uploadDocument = async (req, res) => {
   try {
-    const colId = parseInt(req.body.collection_id);
+    const colId = parseInt(req.body.collection_id || req.query.collection_id, 10);
+    if (isNaN(colId)) return res.status(400).json({ detail: "Valid collection_id is required" });
     await checkCollectionAccess(req.user.id, colId);
 
     const file = req.file;
@@ -116,7 +121,15 @@ const uploadDocument = async (req, res) => {
       }
     });
 
-    await documentQueue.add('processDocument', { documentId: doc.id });
+    try {
+      await documentQueue.add('processDocument', { documentId: doc.id });
+    } catch (queueErr) {
+      console.warn(`⚠️ [BullMQ Warning] Could not queue document processing for doc ID ${doc.id}: ${queueErr.message}. Ensure Redis is running.`);
+      await prisma.documents.update({
+        where: { id: doc.id },
+        data: { status: 'error' }
+      }).catch(() => {});
+    }
 
     await prisma.activity_logs.create({
       data: {

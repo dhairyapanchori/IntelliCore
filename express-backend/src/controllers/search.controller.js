@@ -23,7 +23,7 @@ const advancedSearch = async (req, res) => {
 
     // Prisma $queryRaw for pgvector and complex joins
     // We construct the WHERE clause dynamically
-    let conditions = [`w.organization_id IN (${orgIds.join(',')})`, `d.status = 'completed'`];
+    let conditions = [`w.organization_id IN (${orgIds.join(',') || '0'})`, `d.status = 'completed'`];
     
     if (workspace_id) conditions.push(`w.id = ${parseInt(workspace_id)}`);
     if (department_id) conditions.push(`dept.id = ${parseInt(department_id)}`);

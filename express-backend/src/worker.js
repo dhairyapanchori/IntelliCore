@@ -3,15 +3,41 @@ const { Worker } = require('bullmq');
 const fs = require('fs');
 const pdf = require('pdf-parse');
 const prisma = require('./config/db');
+const { createRedisConnection } = require('./config/redis');
+const IORedis = require('ioredis');
+
+async function checkRedisBeforeStart() {
+  const redisUrl = process.env.REDIS_URL || 'redis://127.0.0.1:6379';
+  console.log('\n┌──────────────────────────────────────────────┐');
+  console.log('│   ⚙️ IntelliCore Background Worker Process    │');
+  console.log('└──────────────────────────────────────────────┘');
+  try {
+    const testRedis = new IORedis(redisUrl, { maxRetriesPerRequest: 1, retryStrategy: () => null, connectTimeout: 2000 });
+    testRedis.on('error', () => {});
+    await new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => { testRedis.disconnect(); reject(new Error("Connection timeout")); }, 2500);
+      testRedis.on('connect', () => { clearTimeout(timeout); testRedis.quit(); resolve(); });
+      testRedis.on('error', (err) => { clearTimeout(timeout); reject(err); });
+    });
+    console.log(`✅ [Redis/BullMQ] Connected successfully (${redisUrl}).`);
+  } catch (err) {
+    console.error(`❌ [Worker Warning] Redis server unreachable at ${redisUrl} (${err.message}).`);
+    console.error(`   BullMQ background job processor cannot start without Redis.`);
+    console.error(`   Shutting down worker process cleanly without crash looping.`);
+    process.exit(0);
+  }
+}
 
 let pipeline = null;
 (async () => {
+  await checkRedisBeforeStart();
   try {
+    console.log("⏳ [Model] Loading Xenova/all-MiniLM-L6-v2 transformers pipeline...");
     const transformers = await import('@xenova/transformers');
     pipeline = await transformers.pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2');
-    console.log("Transformers model loaded for worker.");
+    console.log("✅ [Model] Transformers model loaded successfully for worker.");
   } catch (err) {
-    console.error("Failed to load transformers:", err);
+    console.error("⚠️ [Model] Failed to load transformers:", err.message);
   }
 })();
 
@@ -86,14 +112,18 @@ const worker = new Worker('documentProcessing', async job => {
     }
   }
 }, {
-  connection: {
-    host: process.env.REDIS_HOST || 'redis',
-    port: process.env.REDIS_PORT ? parseInt(process.env.REDIS_PORT) : 6379
-  }
+  connection: createRedisConnection()
 });
 
 worker.on('failed', (job, err) => {
-  console.error(`Job ${job.id} failed:`, err);
+  console.error(`Job ${job && job.id ? job.id : 'unknown'} failed:`, err);
+});
+
+worker.on('error', (err) => {
+  // Catch silent connection errors to prevent unhandled exception crash when Redis is offline
+  if (err.code !== 'ECONNREFUSED' && err.code !== 'ENOTFOUND' && err.code !== 'ERR_CANCELED') {
+    console.error('BullMQ Worker Error:', err.message);
+  }
 });
 
 console.log("BullMQ Worker started, listening to 'documentProcessing' queue...");

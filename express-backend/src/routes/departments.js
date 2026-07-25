@@ -82,9 +82,11 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const { name, description, workspace_id } = req.body;
+    const wsId = parseInt(workspace_id, 10);
+    if (isNaN(wsId)) return res.status(400).json({ detail: "Valid workspace_id is required" });
     const dept = await prisma.departments.create({
       data: {
-        name, description, workspace_id, head_id: req.user.id, status: "Active"
+        name, description, workspace_id: wsId, head_id: req.user.id, status: "Active"
       }
     });
     res.status(201).json({

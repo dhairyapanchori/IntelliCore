@@ -28,13 +28,19 @@ export default function Collections() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
+    if ((!modalWorkspaceId || modalWorkspaceId === 0) && workspaces.length > 0) {
+      setModalWorkspaceId(workspaces[0].id);
+    }
+  }, [workspaces, modalWorkspaceId]);
+
+  useEffect(() => {
     async function fetchModalDeps() {
       if (!modalWorkspaceId) return;
       try {
         const res = await api.get(`/departments?workspace_id=${modalWorkspaceId}`);
         setModalDepartments(res.data);
         if (res.data.length > 0) setModalDepartmentId(res.data[0].id);
-      } catch (err) {}
+      } catch {}
     }
     fetchModalDeps();
   }, [modalWorkspaceId]);

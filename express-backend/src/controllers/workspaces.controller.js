@@ -75,13 +75,15 @@ const getWorkspaces = async (req, res) => {
 const createWorkspace = async (req, res) => {
   try {
     const { name, description, organization_id } = req.body;
-    await checkOrgAccess(req.user.id, organization_id);
+    const orgId = parseInt(organization_id, 10);
+    if (isNaN(orgId)) return res.status(400).json({ detail: "Valid organization_id is required" });
+    await checkOrgAccess(req.user.id, orgId);
 
     const workspace = await prisma.workspaces.create({
       data: {
         name,
         description,
-        organization_id,
+        organization_id: orgId,
         owner_id: req.user.id,
         type: "Private",
         status: "Active"
@@ -89,7 +91,7 @@ const createWorkspace = async (req, res) => {
     });
 
     const orgMembersCount = await prisma.organization_users.count({
-      where: { organization_id }
+      where: { organization_id: orgId }
     });
 
     res.status(201).json({
