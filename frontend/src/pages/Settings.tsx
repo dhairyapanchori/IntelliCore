@@ -24,7 +24,7 @@ export default function Settings() {
         const res = await api.get('/settings');
         setPreferences(res.data.preferences);
         setProfile({ full_name: res.data.user.full_name || '' });
-      } catch (err) {
+      } catch {
         toast.error("Failed to load settings");
       } finally {
         setLoading(false);
@@ -41,7 +41,7 @@ export default function Settings() {
     try {
       await api.put('/settings', { [key]: value });
       toast.success('Setting saved', { id: 'settings-saved' });
-    } catch (err) {
+    } catch {
       setPreferences(previous);
       toast.error('Failed to save setting');
     }
@@ -53,7 +53,7 @@ export default function Settings() {
       const res = await api.put('/settings/profile', { full_name: profile.full_name });
       setUser({ ...user, full_name: res.data.full_name });
       toast.success("Profile updated");
-    } catch (err) {
+    } catch {
       toast.error("Failed to update profile");
     } finally {
       setSaving(false);

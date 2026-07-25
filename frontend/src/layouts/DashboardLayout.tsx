@@ -4,7 +4,7 @@ import { useAuthStore } from '../store/authStore';
 import { useHierarchyStore } from '../store/hierarchyStore';
 import { 
   LayoutDashboard, Bot, Search, Folder, FileText, Network,
-  Building2, BarChart3, Settings, LogOut, Hexagon
+  Building2, BarChart3, Settings, LogOut
 } from 'lucide-react';
 
 export default function DashboardLayout() {

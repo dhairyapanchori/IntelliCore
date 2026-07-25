@@ -67,7 +67,7 @@ const signup = async (req, res) => {
 const login = async (req, res) => {
   try {
     // URL-encoded form data will be parsed by express.urlencoded()
-    const email = req.body.username;
+    const email = req.body.username || req.body.email;
     const password = req.body.password;
 
     const user = await prisma.users.findUnique({ where: { email } });

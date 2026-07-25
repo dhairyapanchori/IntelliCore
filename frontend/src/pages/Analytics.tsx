@@ -65,7 +65,7 @@ export default function Analytics() {
       }
     }
     fetchAnalytics();
-  }, []);
+  }, [currentOrg]);
 
   const formatSize = (bytes: number) => {
     if (!bytes || bytes === 0) return '0 B';

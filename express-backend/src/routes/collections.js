@@ -36,8 +36,10 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const { name, description, department_id } = req.body;
+    const deptId = parseInt(department_id, 10);
+    if (isNaN(deptId)) return res.status(400).json({ detail: "Valid department_id is required" });
     const collection = await prisma.collections.create({
-      data: { name, description, department_id }
+      data: { name, description, department_id: deptId }
     });
     res.status(201).json({
       ...collection,

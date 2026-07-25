@@ -49,3 +49,7 @@ yarn-error.log*
 # Project specific
 uploads/
 express-backend/uploads/
+*.zip
+*.tar
+*.tar.gz
+*.rar

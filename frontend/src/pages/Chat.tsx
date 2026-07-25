@@ -39,6 +39,7 @@ export default function Chat() {
   useEffect(() => {
     fetchSessions();
     fetchRightSidebarData();
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -173,7 +174,7 @@ export default function Chat() {
       await api.patch(`/chat/sessions/${id}`, { title: newTitle });
       setSessions(prev => prev.map(s => s.id === id ? { ...s, title: newTitle } : s));
       setEditingSessionId(null);
-    } catch (e) {
+    } catch {
       toast.error('Failed to rename chat');
     }
   };
