@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { Organization, Workspace, Department, Collection } from '../lib/hierarchy';
 import { hierarchyApi } from '../lib/hierarchy';
+import api from '../lib/api';
 
 interface HierarchyState {
   organizations: Organization[];
@@ -128,7 +129,7 @@ export const useHierarchyStore = create<HierarchyState>((set, get) => ({
     try {
       let departments = [];
       if (workspaceId === 'all') {
-        departments = await api.get('/departments/all').then(res => res.data);
+        departments = await api.get('/departments/all').then((res: any) => res.data);
       } else {
         departments = await hierarchyApi.getDepartments(workspaceId);
       }

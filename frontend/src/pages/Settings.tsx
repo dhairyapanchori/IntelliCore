@@ -51,7 +51,9 @@ export default function Settings() {
     setSaving(true);
     try {
       const res = await api.put('/settings/profile', { full_name: profile.full_name });
-      setUser({ ...user, full_name: res.data.full_name });
+      if (user) {
+        setUser({ ...user, full_name: res.data.full_name });
+      }
       toast.success("Profile updated");
     } catch {
       toast.error("Failed to update profile");

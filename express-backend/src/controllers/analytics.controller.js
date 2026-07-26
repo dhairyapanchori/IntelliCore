@@ -264,4 +264,83 @@ const getAnalyticsDashboard = async (req, res) => {
   } catch(err) { res.status(500).json({ detail: err.message }); }
 };
 
-module.exports = { getOverview, getRecentActivity, getTopCollections, getPopularQueries, getAnalyticsDashboard };
+const getCollectionsAnalytics = async (req, res) => {
+  try {
+    console.log(`\n📊 [Analytics getCollectionsAnalytics] Fetching collections analytics for user ${req.user.id}`);
+    const orgs = await prisma.organization_users.findMany({
+      where: { user_id: req.user.id },
+      select: { organization_id: true }
+    });
+    const orgIds = orgs.map(o => o.organization_id);
+
+    const collections = await prisma.collections.findMany({
+      where: {
+        OR: [
+          { departments: { workspaces: { organization_id: { in: orgIds.length > 0 ? orgIds : [-1] } } } },
+          { departments: { head_id: req.user.id } }
+        ]
+      },
+      include: {
+        documents: true,
+        departments: {
+          select: {
+            id: true,
+            name: true,
+            workspace_id: true,
+            workspaces: {
+              select: {
+                id: true,
+                name: true
+              }
+            }
+          }
+        }
+      },
+      orderBy: { created_at: 'desc' }
+    });
+
+    const result = collections.map(c => {
+      const storageBytes = c.documents.reduce((acc, doc) => acc + (doc.file_size || 0), 0);
+      const statusCounts = { completed: 0, processing: 0, pending: 0, error: 0 };
+      let lastUpdated = c.created_at || new Date().toISOString();
+
+      c.documents.forEach(doc => {
+        const status = doc.status || 'pending';
+        if (status === 'completed') statusCounts.completed++;
+        else if (status === 'processing') statusCounts.processing++;
+        else if (status === 'error' || status === 'failed') statusCounts.error++;
+        else statusCounts.pending++;
+
+        if (doc.updated_at && new Date(doc.updated_at) > new Date(lastUpdated)) {
+          lastUpdated = doc.updated_at;
+        }
+      });
+
+      return {
+        id: c.id,
+        collection_id: c.id,
+        name: c.name,
+        description: c.description,
+        department_id: c.department_id,
+        workspace_id: c.departments ? c.departments.workspace_id : null,
+        department_name: c.departments ? c.departments.name : null,
+        workspace_name: c.departments && c.departments.workspaces ? c.departments.workspaces.name : null,
+        document_count: c.documents.length,
+        total_size: storageBytes,
+        total_size_bytes: storageBytes,
+        last_updated: lastUpdated,
+        created_at: c.created_at,
+        status_breakdown: statusCounts,
+        status_counts: statusCounts
+      };
+    });
+
+    console.log(`    ✅ Returned ${result.length} collections with full analytics attributes.`);
+    res.json(result);
+  } catch (err) {
+    console.error(`    ❌ [Error in getCollectionsAnalytics]:`, err.stack || err);
+    res.status(500).json({ detail: `Failed to fetch collection analytics: ${err.message}`, code: err.code || 'UNKNOWN' });
+  }
+};
+
+module.exports = { getOverview, getRecentActivity, getTopCollections, getPopularQueries, getAnalyticsDashboard, getCollectionsAnalytics };

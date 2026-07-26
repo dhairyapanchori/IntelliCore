@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Folder, Plus, Search, LayoutGrid, List,
-  Briefcase, Code, DollarSign, Users, Scale, FileText, CheckCircle2, Clock, X, Trash2
+  Briefcase, Code, DollarSign, Users, Scale, FileText, CheckCircle2, Clock, X, Trash2, Edit2
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import toast from 'react-hot-toast';
@@ -26,6 +26,12 @@ export default function Collections() {
   const [modalDepartments, setModalDepartments] = useState<any[]>([]);
   const [modalDepartmentId, setModalDepartmentId] = useState<number>(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Edit Modal State
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingCollection, setEditingCollection] = useState<any>(null);
+  const [editName, setEditName] = useState('');
+  const [editDesc, setEditDesc] = useState('');
 
   useEffect(() => {
     if ((!modalWorkspaceId || modalWorkspaceId === 0) && workspaces.length > 0) {
@@ -74,11 +80,11 @@ export default function Collections() {
       }
 
       await api.post('/collections/', {
-        name: newName,
+        name: newName.trim(),
         description: newDesc,
         department_id: targetDepartmentId
       });
-      // Refresh list
+      // Refresh list from real analytics endpoint
       const res = await api.get('/analytics/collections');
       setCollectionsAnalytics(res.data);
       
@@ -87,8 +93,43 @@ export default function Collections() {
       setNewName('');
       setNewDesc('');
     } catch (err: any) {
-      console.error("Failed to create collection", err);
-      toast.error(err.response?.data?.detail || "Failed to create collection");
+      console.error("Failed to create collection:", err);
+      const serverMsg = err.response?.data?.detail || err.response?.data?.message || err.message;
+      const statusText = err.response?.status ? ` (HTTP ${err.response.status})` : '';
+      toast.error(serverMsg ? `Failed to create collection: ${serverMsg}${statusText}` : "Failed to create collection");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleEditClick = (e: React.MouseEvent, col: any) => {
+    e.stopPropagation();
+    setEditingCollection(col);
+    setEditName(col.name || '');
+    setEditDesc(col.description || '');
+    setIsEditModalOpen(true);
+  };
+
+  const handleUpdateCollection = async () => {
+    if (!editName.trim()) {
+      toast.error("Collection name is required");
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      await api.patch(`/collections/${editingCollection.id}`, {
+        name: editName.trim(),
+        description: editDesc
+      });
+      const res = await api.get('/analytics/collections');
+      setCollectionsAnalytics(res.data);
+      toast.success("Collection updated successfully");
+      setIsEditModalOpen(false);
+    } catch (err: any) {
+      console.error("Failed to update collection:", err);
+      const serverMsg = err.response?.data?.detail || err.response?.data?.message || err.message;
+      const statusText = err.response?.status ? ` (HTTP ${err.response.status})` : '';
+      toast.error(serverMsg ? `Failed to update collection: ${serverMsg}${statusText}` : "Failed to update collection");
     } finally {
       setIsSubmitting(false);
     }
@@ -102,7 +143,9 @@ export default function Collections() {
       setCollectionsAnalytics(prev => prev.filter(c => c.id !== id));
       toast.success("Collection deleted successfully");
     } catch (err: any) {
-      toast.error(err.response?.data?.detail || err.message || "Failed to delete collection");
+      console.error("Failed to delete collection:", err);
+      const serverMsg = err.response?.data?.detail || err.response?.data?.message || err.message;
+      toast.error(serverMsg ? `Failed to delete collection: ${serverMsg}` : "Failed to delete collection");
     }
   };
 
@@ -112,7 +155,7 @@ export default function Collections() {
         const res = await api.get('/analytics/collections');
         setCollectionsAnalytics(res.data);
       } catch (err) {
-        console.error('Failed to fetch collections analytics', err);
+        console.error('Failed to fetch collections analytics:', err);
       } finally {
         setLoading(false);
       }
@@ -138,7 +181,7 @@ export default function Collections() {
   };
 
   const filteredCollections = collectionsAnalytics.filter(c => 
-    c.name.toLowerCase().includes(searchQuery.toLowerCase())
+    (c.name || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
@@ -243,29 +286,38 @@ export default function Collections() {
                     <div className="w-12 h-12 bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 rounded-xl flex items-center justify-center shrink-0">
                       <Folder size={22} fill="currentColor" className="opacity-80" />
                     </div>
-                    <button 
-                      onClick={(e) => handleDeleteCollection(e, c.id)} 
-                      className="text-slate-500 hover:text-red-400 p-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity"
-                      title="Delete Collection"
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button 
+                        onClick={(e) => handleEditClick(e, c)} 
+                        className="text-slate-500 hover:text-indigo-400 p-1.5 rounded-md transition-colors"
+                        title="Edit Collection"
+                      >
+                        <Edit2 size={16} />
+                      </button>
+                      <button 
+                        onClick={(e) => handleDeleteCollection(e, c.id)} 
+                        className="text-slate-500 hover:text-red-400 p-1.5 rounded-md transition-colors"
+                        title="Delete Collection"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
                   </div>
                   
-                  <h3 className="text-lg font-bold text-white mb-1 group-hover:text-indigo-400 transition-colors line-clamp-1">{c.name}</h3>
-                  <p className="text-xs text-slate-500 mb-6 line-clamp-2">Enterprise knowledge collection securely isolated via workspace policies.</p>
+                  <h3 title={c.name} className="text-lg font-bold text-white mb-1 group-hover:text-indigo-400 transition-colors break-words line-clamp-3">{c.name}</h3>
+                  <p title={c.description || undefined} className="text-xs text-slate-500 mb-6 line-clamp-3">{c.description || 'Enterprise knowledge collection securely isolated via workspace policies.'}</p>
                   
                   <div className="mt-auto grid grid-cols-2 gap-4">
                     <div>
                       <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Documents</div>
                       <div className="text-sm font-semibold text-white flex items-center gap-1.5">
-                        <FileText size={14} className="text-blue-400" /> {c.document_count}
+                        <FileText size={14} className="text-blue-400" /> {c.document_count || 0}
                       </div>
                     </div>
                     <div>
                       <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Storage Size</div>
                       <div className="text-sm font-semibold text-white">
-                        {formatSize(c.total_size || 0)}
+                        {formatSize(c.total_size || c.total_size_bytes || 0)}
                       </div>
                     </div>
                   </div>
@@ -369,6 +421,58 @@ export default function Collections() {
               >
                 {isSubmitting ? <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin"></div> : null}
                 Create Collection
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {isEditModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#13161F] border border-slate-800 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
+            <div className="flex items-center justify-between p-6 border-b border-slate-800">
+              <h3 className="text-lg font-bold text-white">Edit Collection</h3>
+              <button onClick={() => setIsEditModalOpen(false)} className="text-slate-500 hover:text-white transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Collection Name</label>
+                <input 
+                  type="text" 
+                  value={editName}
+                  onChange={e => setEditName(e.target.value)}
+                  placeholder="e.g. Employee Handbook" 
+                  className="w-full bg-[#0A0C10] border border-slate-700 rounded-lg px-4 py-2.5 text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 transition-all"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Description</label>
+                <textarea 
+                  value={editDesc}
+                  onChange={e => setEditDesc(e.target.value)}
+                  placeholder="What is this collection for?" 
+                  rows={2}
+                  className="w-full bg-[#0A0C10] border border-slate-700 rounded-lg px-4 py-2.5 text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 transition-all resize-none"
+                ></textarea>
+              </div>
+            </div>
+            <div className="p-6 border-t border-slate-800 flex justify-end gap-3 bg-[#0A0C10]/50">
+              <button 
+                onClick={() => setIsEditModalOpen(false)}
+                className="px-4 py-2 text-sm font-medium text-slate-300 hover:text-white transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleUpdateCollection}
+                disabled={!editName.trim() || isSubmitting}
+                className="bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 flex items-center gap-2"
+              >
+                {isSubmitting ? <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin"></div> : null}
+                Save Changes
               </button>
             </div>
           </div>
