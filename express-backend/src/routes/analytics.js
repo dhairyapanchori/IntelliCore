@@ -1,5 +1,5 @@
 const express = require('express');
-const { getOverview, getRecentActivity, getTopCollections, getPopularQueries, getAnalyticsDashboard } = require('../controllers/analytics.controller');
+const { getOverview, getRecentActivity, getTopCollections, getPopularQueries, getAnalyticsDashboard, getCollectionsAnalytics } = require('../controllers/analytics.controller');
 const { authenticateToken } = require('../middlewares/auth.middleware');
 
 const router = express.Router();
@@ -10,5 +10,6 @@ router.get('/dashboard', getAnalyticsDashboard);
 router.get('/recent-activity', getRecentActivity);
 router.get('/top-collections', getTopCollections);
 router.get('/popular-queries', getPopularQueries);
+router.get('/collections', getCollectionsAnalytics);
 
 module.exports = router;
