@@ -181,6 +181,9 @@ const deleteDocument = async (req, res) => {
       fs.unlinkSync(doc.storage_path);
     }
     
+    await prisma.document_chunks.deleteMany({ where: { document_id: docId } });
+    await prisma.document_metadata.deleteMany({ where: { document_id: docId } });
+    
     await prisma.documents.delete({ where: { id: docId } });
     res.status(204).send();
   } catch (err) { res.status(500).json({ detail: err.message }); }

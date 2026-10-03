@@ -161,6 +161,18 @@ router.delete('/:collection_id', async (req, res) => {
   try {
     const id = parseInt(req.params.collection_id, 10);
     if (isNaN(id)) return res.status(400).json({ detail: "Valid numeric collection ID required in URL path." });
+    
+    const fs = require('fs');
+    const docs = await prisma.documents.findMany({ where: { collection_id: id } });
+    for (const doc of docs) {
+      if (doc.storage_path && fs.existsSync(doc.storage_path)) {
+        fs.unlinkSync(doc.storage_path);
+      }
+      await prisma.document_chunks.deleteMany({ where: { document_id: doc.id } });
+      await prisma.document_metadata.deleteMany({ where: { document_id: doc.id } });
+    }
+    await prisma.documents.deleteMany({ where: { collection_id: id } });
+
     await prisma.collections.delete({ where: { id } });
     res.status(204).send();
   } catch (err) {
