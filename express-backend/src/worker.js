@@ -7,7 +7,7 @@ const prisma = require('./config/db');
 const { createRedisConnection } = require('./config/redis');
 const { extractPdfPages } = require('./services/pdfExtractionService');
 const { terminateOcrWorkers } = require('./services/pdfOcrService');
-const { chunkPdfPages, chunkPlainText } = require('./services/documentChunkingService');
+const { chunkPdfPages, chunkPlainText, countTotalTokens, MODEL_MAX_SEQ_LENGTH } = require('./services/documentChunkingService');
 
 const EXPECTED_EMBEDDING_DIMS = parseInt(process.env.EMBEDDING_DIMENSIONS, 10) || 384;
 const MAX_DOCUMENT_BYTES = parseInt(process.env.MAX_DOCUMENT_BYTES, 10) || 50 * 1024 * 1024; // 50 MB
@@ -58,6 +58,12 @@ function getEmbeddingPipeline() {
 async function generateValidatedEmbedding(pipe, textContent) {
   if (!textContent || typeof textContent !== 'string' || !textContent.trim()) {
     throw new Error('Cannot generate embedding for empty chunk text.');
+  }
+  if (typeof pipe?.tokenizer === 'function') {
+    const totalTokens = countTotalTokens(textContent, pipe.tokenizer);
+    if (totalTokens > MODEL_MAX_SEQ_LENGTH) {
+      throw new Error(`Chunk exceeds all-MiniLM-L6-v2 max_seq_length (${totalTokens} > ${MODEL_MAX_SEQ_LENGTH} total tokens).`);
+    }
   }
   const output = await pipe(textContent, { pooling: 'mean', normalize: true });
   const embedding = Array.from(output?.data || []);

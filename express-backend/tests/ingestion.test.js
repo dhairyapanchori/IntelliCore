@@ -9,8 +9,11 @@ const { createCanvas } = require('canvas');
 const { extractPdfPages } = require('../src/services/pdfExtractionService');
 const { terminateOcrWorkers } = require('../src/services/pdfOcrService');
 const {
+  MODEL_MAX_SEQ_LENGTH,
   CHUNK_CONFIG,
-  countTokens,
+  countTotalTokens,
+  countContentTokens,
+  enforceTokenLimit,
   chunkPdfPages,
   chunkPlainText,
 } = require('../src/services/documentChunkingService');
@@ -223,18 +226,52 @@ test('TEST 8 & 10: Sentence continuity and overlap retain context between adjace
   assert.ok(chunks[1].textContent.includes(tail0), 'Expected overlap from end of chunk 0 in chunk 1');
 });
 
-test('TEST 9: Every final chunk stays safely below embedding tokenizer limit', async () => {
+test('TEST 9: Every final chunk stays <= 240 total tokens (including [CLS]/[SEP]) and generates 384-dim embeddings', async () => {
   const pipe = await getTestPipeline();
-  const longUnbroken = 'A'.repeat(4000);
-  const longProse = Array.from({ length: 120 }, (_, i) => `Sentence ${i}: Enterprise RAG indexing verifies token budgets.`).join(' ');
-  const chunks = await chunkPlainText(`${longProse}\n\n${longUnbroken}`, { tokenizer: pipe.tokenizer });
+  assert.equal(MODEL_MAX_SEQ_LENGTH, 256);
+  assert.equal(CHUNK_CONFIG.chunkSizeTokens, 200);
+  assert.equal(CHUNK_CONFIG.chunkOverlapTokens, 30);
+  assert.equal(CHUNK_CONFIG.maxChunkTotalTokens, 240);
 
-  assert.ok(chunks.length > 3);
-  for (const chunk of chunks) {
-    const tokens = countTokens(chunk.textContent, pipe.tokenizer);
-    assert.ok(tokens <= CHUNK_CONFIG.maxChunkTokens, `Chunk exceeded maxChunkTokens (${tokens} > ${CHUNK_CONFIG.maxChunkTokens})`);
-    assert.ok(tokens < 512, `Chunk exceeded model_max_length (${tokens} >= 512)`);
+  // Verify special tokens [CLS] and [SEP] are included in total token count
+  const sample = 'IntelliCore token validation check.';
+  assert.equal(countTotalTokens(sample, pipe.tokenizer), countContentTokens(sample, pipe.tokenizer) + 2);
+
+  // Construct a long single paragraph with unique markers so we can verify zero silent truncation
+  const longUnbroken = 'A'.repeat(2500);
+  const numberedSentences = Array.from(
+    { length: 80 },
+    (_, i) => `Clause-${i + 1}: Enterprise RAG indexing enforces strict MiniLM token budgets.`
+  );
+  const longParagraph = numberedSentences.join(' ');
+
+  const chunks = await chunkPlainText(`${longParagraph}\n\n${longUnbroken}`, { tokenizer: pipe.tokenizer });
+  assert.ok(chunks.length >= 6);
+
+  // Verify every numbered clause appears in at least one chunk (no silent truncation)
+  const combined = chunks.map((c) => c.textContent).join('\n');
+  for (let i = 1; i <= 80; i++) {
+    assert.ok(combined.includes(`Clause-${i}:`), `Missing Clause-${i} — possible silent truncation`);
   }
+
+  // Verify hard 240 total token ceiling (including [CLS]/[SEP]) AND 384-dim embedding generation
+  for (const chunk of chunks) {
+    const totalTokens = countTotalTokens(chunk.textContent, pipe.tokenizer);
+    assert.ok(
+      totalTokens <= 240,
+      `Chunk exceeded 240 total token ceiling (${totalTokens} > 240)`
+    );
+    assert.ok(totalTokens <= MODEL_MAX_SEQ_LENGTH);
+    const embStr = await generateValidatedEmbedding(pipe, chunk.textContent);
+    const parsed = JSON.parse(embStr);
+    assert.equal(parsed.length, EXPECTED_EMBEDDING_DIMS);
+  }
+
+  // Verify missing tokenizer fails with controlled error when fallback is not enabled
+  await assert.rejects(
+    () => chunkPlainText('No tokenizer test', {}),
+    /Embedding tokenizer is required/
+  );
 });
 
 test('TEST 11: Page metadata preserves exact source page numbers and extraction methods', async () => {
@@ -281,7 +318,7 @@ test('TEST 13: Large multi-page document chunks within token and memory bounds',
   assert.ok(chunks.length > 25);
   for (const c of chunks) {
     assert.ok(c.pageNumber >= 1 && c.pageNumber <= 25);
-    assert.ok(c.tokenCount <= CHUNK_CONFIG.maxChunkTokens);
+    assert.ok(c.tokenCount <= CHUNK_CONFIG.maxChunkTotalTokens);
   }
 });
 
