@@ -113,7 +113,7 @@ const semanticSearch = async (req, res) => {
     }
 
     const results = await prisma.$queryRawUnsafe(`
-      SELECT ch.id as chunk_id, d.id as document_id, d.title as document_title, ch.text_content, 
+      SELECT ch.id as chunk_id, d.id as document_id, d.title as document_title, ch.page_number, ch.text_content, 
              1 - (ch.embedding <=> $1::vector) as similarity
       FROM document_chunks ch
       JOIN documents d ON ch.document_id = d.id
@@ -129,6 +129,7 @@ const semanticSearch = async (req, res) => {
       chunk_id: r.chunk_id,
       document_id: r.document_id,
       document_title: r.document_title,
+      page_number: r.page_number ?? null,
       text_content: r.text_content,
       similarity: Math.max(0, parseFloat(r.similarity) || 0)
     }));
@@ -158,7 +159,10 @@ const semanticSearch = async (req, res) => {
         else messages.push(new AIMessage(msg.content));
       }
 
-      const contextText = searchResults.map(r => `Document: ${r.document_title}\nExcerpt: ${r.text_content}`).join('\n\n');
+      const contextText = searchResults.map(r => {
+        const pageLabel = r.page_number ? ` (Page ${r.page_number})` : '';
+        return `Document: ${r.document_title}${pageLabel}\nExcerpt: ${r.text_content}`;
+      }).join('\n\n');
       messages.push(new HumanMessage(`Context from documents:\n${contextText}\n\nUser Query: ${query}`));
 
       try {

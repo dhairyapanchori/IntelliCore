@@ -3,7 +3,11 @@ const multer = require('multer');
 const { getDocuments, getAllDocuments, uploadDocument, getDocumentDetails, deleteDocument, getRelatedDocuments, getDocumentChunks } = require('../controllers/documents.controller');
 const { authenticateToken } = require('../middlewares/auth.middleware');
 
-const upload = multer({ dest: 'uploads/temp/' });
+const MAX_DOCUMENT_BYTES = parseInt(process.env.MAX_DOCUMENT_BYTES, 10) || 50 * 1024 * 1024;
+const upload = multer({
+  dest: 'uploads/temp/',
+  limits: { fileSize: MAX_DOCUMENT_BYTES }
+});
 const router = express.Router();
 
 router.use(authenticateToken);

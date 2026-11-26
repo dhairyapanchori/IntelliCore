@@ -94,12 +94,12 @@ const getAllDocuments = async (req, res) => {
 };
 
 const uploadDocument = async (req, res) => {
+  const file = req.file;
   try {
     const colId = parseInt(req.body.collection_id || req.query.collection_id, 10);
     if (isNaN(colId)) return res.status(400).json({ detail: "Valid collection_id is required" });
     await checkCollectionAccess(req.user.id, colId);
 
-    const file = req.file;
     if (!file) return res.status(400).json({ detail: "File required" });
 
     const ext = path.extname(file.originalname).toLowerCase();
@@ -107,7 +107,6 @@ const uploadDocument = async (req, res) => {
     const storagePath = path.join(UPLOAD_DIR, uniqueFilename);
 
     fs.copyFileSync(file.path, storagePath);
-    fs.unlinkSync(file.path); // remove multer temp file
 
     const doc = await prisma.documents.create({
       data: {
@@ -122,7 +121,16 @@ const uploadDocument = async (req, res) => {
     });
 
     try {
-      await documentQueue.add('processDocument', { documentId: doc.id });
+      await documentQueue.add(
+        'processDocument',
+        { documentId: doc.id },
+        {
+          attempts: 3,
+          backoff: { type: 'exponential', delay: 3000 },
+          removeOnComplete: true,
+          removeOnFail: 50
+        }
+      );
     } catch (queueErr) {
       console.warn(`⚠️ [BullMQ Warning] Could not queue document processing for doc ID ${doc.id}: ${queueErr.message}. Ensure Redis is running.`);
       await prisma.documents.update({
@@ -142,7 +150,13 @@ const uploadDocument = async (req, res) => {
     });
 
     res.status(201).json(doc);
-  } catch (err) { res.status(500).json({ detail: err.message }); }
+  } catch (err) {
+    res.status(500).json({ detail: err.message });
+  } finally {
+    if (file && file.path && fs.existsSync(file.path)) {
+      try { fs.unlinkSync(file.path); } catch {}
+    }
+  }
 };
 
 const getDocumentDetails = async (req, res) => {

@@ -36,7 +36,7 @@ const advancedSearch = async (req, res) => {
     if (search_type === "keyword" || search_type === "hybrid") {
       const kw = `%${query}%`;
       const kwResults = await prisma.$queryRawUnsafe(`
-        SELECT d.id as document_id, d.title, ch.text_content as chunk_text, 1.0 as similarity
+        SELECT d.id as document_id, d.title, ch.page_number, ch.text_content as chunk_text, 1.0 as similarity
         FROM document_chunks ch
         JOIN documents d ON ch.document_id = d.id
         JOIN collections c ON d.collection_id = c.id
@@ -54,7 +54,7 @@ const advancedSearch = async (req, res) => {
       const embeddingStr = `[${embedding.join(',')}]`;
 
       const semResults = await prisma.$queryRawUnsafe(`
-        SELECT d.id as document_id, d.title, ch.text_content as chunk_text, 
+        SELECT d.id as document_id, d.title, ch.page_number, ch.text_content as chunk_text, 
                1 - (ch.embedding <=> $1::vector) as similarity
         FROM document_chunks ch
         JOIN documents d ON ch.document_id = d.id
@@ -81,6 +81,7 @@ const advancedSearch = async (req, res) => {
         uniqueResults[docId] = {
           document_id: docId,
           title: r.title,
+          page_number: r.page_number ?? null,
           chunk_text: r.chunk_text,
           similarity: r.similarity
         };
